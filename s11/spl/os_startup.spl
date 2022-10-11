@@ -48,4 +48,5 @@ SP = 8*512;
 [PROCESS_TABLE + 11] = 80;
 [PROCESS_TABLE + 1] = 0;
 [SYSTEM_STATUS_TABLE + 1] = 0;
+breakpoint;
 ireturn;

@@ -1,13 +1,11 @@
 int main()
 {
 decl
-    int temp,num;
+    int temp;
 enddecl
 begin
-    num=101;
-    while ( num <= 200 ) do
-         temp = exposcall ( "Write" , -2, num );
-         num = num + 1;
+    while (1>0) do
+         temp = exposcall ( "Write" , -2, "idle" );
     endwhile;
     return 0;
 end

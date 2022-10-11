@@ -11,7 +11,7 @@ loadi(5, 18);
 loadi(16,29);	// int7	
 loadi(17,30);
 loadi(83,69);	// even prog
-loadi(50,63);	// scheduler	
+loadi(50,63);	 //scheduler	
 loadi(51,64);
 
 
