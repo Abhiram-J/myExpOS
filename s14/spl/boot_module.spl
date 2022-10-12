@@ -11,6 +11,7 @@ loadi(5, 18);
 loadi(16,29);	// int7	
 loadi(17,30);
 loadi(83,69);	// even prog
+loadi(91,70);	// prime prog
 loadi(50,63);	// scheduler	
 loadi(51,64);
 
@@ -102,9 +103,53 @@ PTBR = PAGE_TABLE_BASE+40;
 
 [86 * 512] = [83 * 512 + 1];
 
+// setting up page table for prime program
+PTBR = PAGE_TABLE_BASE+60;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = 89;
+[PTBR+5] = "0110";
+[PTBR+6] = 90;
+[PTBR+7] = "0110";
+
+//Code
+[PTBR+8] = 91;
+[PTBR+9] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 92;
+[PTBR+17] = "0110";
+[PTBR+18] = 93;
+[PTBR+19] = "0110";
+
+
+// even
+[PROCESS_TABLE + 49] = 3;
+[PROCESS_TABLE + 52] = CREATED;
+[PROCESS_TABLE + 59] = 94;
+[PROCESS_TABLE + 60] = 0;
+[PROCESS_TABLE + 61] = 8*512;
+[PROCESS_TABLE + 62] = PAGE_TABLE_BASE+60;
+[PROCESS_TABLE + 63] = 10;
+
+[92 * 512] = [91 * 512 + 1];
+
+
 // setting all other states as terminated
 alias pid R0;
-pid = 3;
+pid = 4;
 while ( pid < 16) do
 	[PROCESS_TABLE + pid*16 + 4] = TERMINATED;
 	pid = pid +1;

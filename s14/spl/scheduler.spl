@@ -1,6 +1,6 @@
 alias currentPID R0;
 currentPID = [SYSTEM_STATUS_TABLE+1];
-
+multipush (BP);
 alias process_table_entry R1;
 process_table_entry = PROCESS_TABLE + currentPID * 16;
 [process_table_entry + 12] = SP % 512;
@@ -26,9 +26,11 @@ PTLR = [new_process_table + 15];
 if([new_process_table + 4] == CREATED) then
 	[new_process_table + 4] = RUNNING;
 	SP = [new_process_table + 13];
+	[new_process_table + 9] = 0;
 	ireturn;
 endif;
 
 [new_process_table + 4] = RUNNING;
-
+breakpoint;
+multipop(BP);
 return;
