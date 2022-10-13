@@ -1,0 +1,30 @@
+breakpoint;
+
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE+1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1] * 16) + 11] * 512 - 1;
+backup;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = TERMINATED;
+
+alias newPID R2;
+alias currPID R3;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+newPID = currPID + 1;
+
+while ( [PROCESS_TABLE + newPID*16 + 4] == TERMINATED && newPID != currPID) do
+	newPID = newPID + 1;
+	newPID = newPID%16;
+	if(newPID == 0 ) then
+		newPID = 1;
+	endif;
+endwhile;
+
+if ( newPID == currPID) then
+	halt;
+endif;
+
+call SCHEDULER;
+restore;
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+breakpoint;
+ireturn;

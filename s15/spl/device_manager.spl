@@ -1,0 +1,25 @@
+breakpoint;
+
+alias func_num R1;
+alias currPID R2;
+alias word R3;
+
+if ( func_num == 3 ) then
+	// acquire terminal
+	
+	multipush(R1,R2);
+	func_num = 8;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2);
+	print word;
+	
+	// release terminal
+	
+	multipush(R1,R2);
+	func_num = 9;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2);
+endif;
+
+breakpoint;
+return;
