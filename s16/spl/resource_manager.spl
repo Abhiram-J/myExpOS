@@ -25,6 +25,7 @@ if ( func_num == 9 ) then
 		R0 = -1;
 		return;
 	endif;
+	
 	[TERMINAL_STATUS_TABLE] = 0;
 	
 	alias tempPID R4;

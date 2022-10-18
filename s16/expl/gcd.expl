@@ -1,11 +1,18 @@
 int main()
 {
 decl
-    int temp,num;
+	int temp,a,b;
 enddecl
 begin
-    temp = exposcall("Read",-1,num);
-    temp = exposcall("Write",-2,num);
-    return 0;
+	temp = exposcall("Read",-1,a);
+        temp = exposcall("Read",-1,b);
+     
+        while ( b != 0) do
+        	temp = a%b;
+        	a = b;
+        	b = temp;
+        endwhile;
+        temp = exposcall("Write",-2,a);
+        return 0;
 end
 }

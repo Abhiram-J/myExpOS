@@ -7,10 +7,10 @@ decl
     int temp,n,i,j;
 enddecl
 begin
-    temp = exposcall("Write",-2,n);
+    temp = exposcall("Read",-1,n);
     i = 0;
     while( i < n ) do
-     	temp = exposcall("Write",-2,a[i]);
+     	temp = exposcall("Read",-1,a[i]);
      	i = i + 1;
     endwhile;
     
@@ -25,7 +25,13 @@ begin
     	     j = j + 1;
     	endwhile;
     	i = i + 1;
-    	j = i;
+    	j = 1;
+    endwhile;
+    
+    i=0;
+    while( i < n ) do
+     	temp = exposcall("Write",-2,a[i]);
+     	i = i + 1;
     endwhile;
     
     return 0;

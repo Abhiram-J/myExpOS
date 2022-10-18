@@ -5,7 +5,7 @@ decl
 enddecl
 begin
     while (1>0) do
-         temp = exposcall ( "Write" , -2, "idle" );
+         temp =1;
     endwhile;
     return 0;
 end

@@ -23,7 +23,7 @@ then
 	 [physicalAddrRetVal] = -1;
 else
 	 alias word R5;
-	 word = userSP-3 ;
+	 word = [([PTBR + 2 * (userSP - 3)/ 512] * 512) + ((userSP - 3) % 512)];
 	 
 	 multipush(R0,R1,R2,R3,R4,R5);
 	 

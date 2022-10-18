@@ -23,6 +23,7 @@ then
 	 physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
 	 [physicalAddrRetVal] = -1;
 else
+	
 	 alias word R5;
 	 word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
 	 
