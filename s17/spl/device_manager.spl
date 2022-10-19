@@ -1,0 +1,49 @@
+breakpoint;
+
+alias func_num R1;
+alias currPID R2;
+
+if ( func_num == 3 ) then
+	// acquire terminal
+	alias word R3;
+	
+	multipush(R1,R2);
+	func_num = 8;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2);
+	print word;
+	
+	// release terminal
+	
+	multipush(R1,R2);
+	func_num = 9;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2);
+endif;
+
+
+if ( func_num == 4 ) then
+	// acquire terminal
+	alias word_addr R3;
+	multipush(R1,R2,R3);
+	func_num = 8;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2,R3);
+	read;
+	[PROCESS_TABLE + 16*currPID + 4] = WAIT_TERMINAL;
+	
+	// context switch module
+	
+	multipush(R1,R2,R3);
+	call SCHEDULER;
+	multipop(R1,R2,R3);
+	
+	alias word_phy R4;
+	word_phy = ([PTBR + 2 * ((word_addr) / 512)] * 512) + ((word_addr) % 512);
+	
+	[word_phy]  = [PROCESS_TABLE + 16*currPID + 8];
+	
+endif;
+
+breakpoint;
+return;

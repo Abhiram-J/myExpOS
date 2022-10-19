@@ -1,0 +1,130 @@
+breakpoint;
+
+alias userSP R0;
+userSP = SP;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9;
+
+alias file_name R1;
+file_name = [([PTBR + 2 * (userSP - 3)/ 512] * 512) + ((userSP - 3) % 512)]; // or -4
+
+alias inode_index R6;
+inode_index = 0;
+while( [INODE_TABLE + inode_index*16 + 1] != file_name) do
+	inode_index = inode_index + 1;
+	if ( inode_index == 60) then
+		break;
+	endif;
+endwhile;
+
+if ( [INODE_TABLE + inode_index*16 + 1] != file_name || [INODE_TABLE + inode_index*16 + 0] != EXEC) then
+	[([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512)] = -1;
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];
+	ireturn;
+endif;
+
+multipush(R0,R1,R2);
+	 
+alias func_num R1;
+alias currPID R2;
+func_num = 3;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+	 
+call PROCESS_MANAGER;
+	 
+multipop(R0,R1,R2);
+
+alias user_area_page_num R3;
+user_area_page_num = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+[MEMORY_FREE_LIST + user_area_page_num] = [MEMORY_FREE_LIST + user_area_page_num] + 1;
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = RUNNING;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 7] = inode_index;
+
+// setting up page table for new process
+PTBR = PAGE_TABLE_BASE+20*[SYSTEM_STATUS_TABLE + 1];
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+multipush(R0);
+func_num = 1;
+
+call MEMORY_MANAGER;
+
+//Heap
+[PTBR+4] = R0;
+[PTBR+5] = "0110";
+
+func_num = 1;
+call MEMORY_MANAGER;
+
+//Heap
+[PTBR+6] = R0;
+[PTBR+7] = "0110";
+
+func_num = 1;
+call MEMORY_MANAGER;
+
+//Stack
+[PTBR+16] = R0;
+[PTBR+17] = "0110";
+
+func_num = 1;
+call MEMORY_MANAGER;
+
+//Stack
+[PTBR+18] = R0;
+[PTBR+19] = "0110";
+
+multipop(R0);
+
+breakpoint;
+alias blocks_occupied R4;
+blocks_occupied = [INODE_TABLE + inode_index*16 + 2]/512 + 1;
+
+alias i R5;
+i = 8;
+while( blocks_occupied > 0 ) do
+	multipush(R4,R5);
+	func_num = 1;
+	call MEMORY_MANAGER;
+	multipop(R4,R5);
+	[PTBR+i] = R0;
+	[PTBR+i+1] = "0110";
+	blocks_occupied = blocks_occupied -1;
+	i = i + 2;
+endwhile;
+
+while ( i <= 14) do
+	[PTBR+i] = -1;
+	[PTBR+i+1] = "0000";
+	i = i + 2;
+endwhile;
+breakpoint;
+
+alias j R7;
+i = 8;
+j = 8;
+while ( i<=14 &&  [PTBR+i] != -1 ) do
+	loadi([PTBR+i],[INODE_TABLE + inode_index*16 + j]);
+	i = i + 2;
+	j = j + 1;
+endwhile;
+
+SP = 8 * 512 ;
+[[PTBR+16] * 512] = [[PTBR+8] * 512 + 1];
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+breakpoint;
+ireturn;
