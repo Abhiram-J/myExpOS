@@ -1,0 +1,77 @@
+breakpoint;
+
+alias func_num R1;
+alias currPID R2;
+
+if ( func_num == 2) then
+	alias page_num R3;
+	alias block_num R4;
+
+	// acquire disk
+	multipush(R2,R3,R4);
+	func_num = 3;
+
+	call RESOURCE_MANAGER;
+
+	multipop(R2,R3,R4);
+
+	[DISK_STATUS_TABLE + 1] = 0;
+	[DISK_STATUS_TABLE + 2] = page_num;
+	[DISK_STATUS_TABLE + 3] = block_num;
+
+	load(page_num,block_num);
+
+	[PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
+
+	multipush(R2,R3,R4);
+	call SCHEDULER;
+	multipop(R2,R3,R4);
+
+endif;
+
+
+if ( func_num == 3 ) then
+	// acquire terminal
+	alias word R3;
+	
+	multipush(R1,R2);
+	func_num = 8;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2);
+	print word;
+	
+	// release terminal
+	
+	multipush(R1,R2);
+	func_num = 9;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2);
+
+endif;
+
+
+if ( func_num == 4 ) then
+	// acquire terminal
+	alias word_addr R3;
+	multipush(R1,R2,R3);
+	func_num = 8;
+	call RESOURCE_MANAGER;
+	multipop(R1,R2,R3);
+	read;
+	[PROCESS_TABLE + 16*currPID + 4] = WAIT_TERMINAL;
+	
+	// context switch module
+	
+	multipush(R1,R2,R3);
+	call SCHEDULER;
+	multipop(R1,R2,R3);
+	
+	alias word_phy R4;
+	word_phy = ([PTBR + 2 * ((word_addr) / 512)] * 512) + ((word_addr) % 512);
+	
+	[word_phy]  = [PROCESS_TABLE + 16*currPID + 8];
+	
+endif;
+
+breakpoint;
+return;

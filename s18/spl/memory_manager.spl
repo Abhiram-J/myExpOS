@@ -1,0 +1,49 @@
+breakpoint;
+
+alias func_num R1;
+alias page_num R2;
+
+if ( func_num == 1 ) then
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+
+    while( [SYSTEM_STATUS_TABLE + 2] == 0 ) do
+       [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
+       multipush(R1,R2);
+       call SCHEDULER; 
+       multipop(R1,R2);
+    endwhile;
+
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+    [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+    
+    alias free_page R0;
+    free_page = 76;
+    while([MEMORY_FREE_LIST + free_page] == 1) do
+        free_page = free_page + 1;
+    endwhile;
+    [MEMORY_FREE_LIST + free_page] = 1;
+
+    
+endif;
+
+
+if ( func_num == 2 ) then
+	[MEMORY_FREE_LIST + page_num] = [MEMORY_FREE_LIST + page_num] - 1;
+
+    if ([MEMORY_FREE_LIST + page_num] == 0) then
+        [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+    endif;
+
+    alias i R3;
+    i = 0 ;
+    while(i < 16) do
+        if([PROCESS_TABLE + i*16 + 4] == WAIT_MEM) then
+            [PROCESS_TABLE + i*16 + 4 ] = READY;
+        endif;
+        i = i + 1;
+    endwhile;
+	
+endif;
+
+breakpoint;
+return;

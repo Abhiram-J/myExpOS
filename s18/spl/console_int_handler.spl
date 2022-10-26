@@ -1,0 +1,26 @@
+breakpoint;
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE+1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1] * 16) + 11] * 512 - 1;
+
+backup;
+
+alias reqPID R2;
+reqPID = [TERMINAL_STATUS_TABLE + 1];
+
+[PROCESS_TABLE + 16*reqPID + 8] = P0;
+
+multipush(R2);
+
+alias func_num R1;
+func_num = 9;
+
+call RESOURCE_MANAGER;
+
+multipop(R2);
+
+restore;
+
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+breakpoint;
+ireturn;

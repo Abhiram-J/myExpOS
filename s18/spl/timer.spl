@@ -1,0 +1,19 @@
+breakpoint;
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE+1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1] * 16) + 11] * 512 - 1;
+
+backup;
+
+
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE+1] * 16) + 4] = READY;
+
+
+call SCHEDULER;
+
+
+restore;
+
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+breakpoint;
+ireturn;
