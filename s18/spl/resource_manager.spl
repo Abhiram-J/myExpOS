@@ -11,12 +11,12 @@ if (func_num == 3) then
 		multipush(R1,R2,R3);
 		
 		call SCHEDULER;
-		
 		multipop(R1,R2,R3);
 	endwhile;
 
 	[DISK_STATUS_TABLE] = 1;
 	[DISK_STATUS_TABLE + 4] = currPID;
+	return;
 
 endif;
 

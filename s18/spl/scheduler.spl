@@ -11,9 +11,13 @@ process_table_entry = PROCESS_TABLE + currentPID * 16;
 
 alias newPID R2;
 newPID = currentPID + 1;
-while ( [PROCESS_TABLE + newPID*16 + 4] == TERMINATED) do
+while ( [PROCESS_TABLE + newPID*16 + 4] != READY && [PROCESS_TABLE + newPID*16 + 4] != CREATED) do
 	newPID = newPID + 1;
-	newPID = newPID%16;
+	newPID = newPID % 16;
+	if (newPID == currentPID) then
+		newPID = 0;
+		break;
+	endif;
 endwhile;
 
 
@@ -34,6 +38,7 @@ endif;
 
 [new_process_table + 4] = RUNNING;
 multipop(BP);
-
+// print "newproc";
+// print [SYSTEM_STATUS_TABLE + 1];
 breakpoint;
 return;

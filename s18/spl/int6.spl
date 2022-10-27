@@ -1,5 +1,4 @@
 breakpoint;
-
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 7;
 alias userSP R0;
 userSP = SP;

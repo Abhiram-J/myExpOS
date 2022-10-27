@@ -4,23 +4,20 @@ alias userSP R0;
 userSP = SP;
 
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
-SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11]*512 - 1;		//change
 
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9;
 
 alias file_name R1;
-file_name = [([PTBR + 2 * (userSP - 3)/ 512] * 512) + ((userSP - 3) % 512)]; 
+file_name = [([PTBR + 2 * (userSP - 4)/ 512] * 512) + ((userSP - 4) % 512)];  // change
 
 alias inode_index R6;
 inode_index = 0;
-while( [INODE_TABLE + inode_index*16 + 1] != file_name) do
-	inode_index = inode_index + 1;
-	if ( inode_index == 60) then
-		break;
-	endif;
+while( inode_index < MAX_FILE_NUM && [INODE_TABLE + inode_index*16 + 1] != file_name) do
+	inode_index = inode_index + 1;	
 endwhile;
 
-if ( [INODE_TABLE + inode_index*16 + 1] != file_name || [INODE_TABLE + inode_index*16 + 0] != EXEC) then
+if ( inode_index == MAX_FILE_NUM || [INODE_TABLE + inode_index*16 + 1] != file_name || [INODE_TABLE + inode_index*16 + 0] != EXEC) then
 	[([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512)] = -1;
 	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
 	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];
@@ -43,7 +40,7 @@ user_area_page_num = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
 [MEMORY_FREE_LIST + user_area_page_num] = [MEMORY_FREE_LIST + user_area_page_num] + 1;
 [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
 
-SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+SP = user_area_page_num*512 - 1;
 
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = RUNNING;
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 7] = inode_index;
@@ -101,33 +98,34 @@ while( blocks_occupied > 0 ) do
 	call MEMORY_MANAGER;
 	multipop(R4,R5);
 	[PTBR+i] = R0;
-	[PTBR+i+1] = "0110";
+	[PTBR+i+1] = "0100";
 	blocks_occupied = blocks_occupied -1;
 	i = i + 2;
 endwhile;
 
-while ( i <= 14) do
+while ( i < 16) do
 	[PTBR+i] = -1;
 	[PTBR+i+1] = "0000";
 	i = i + 2;
 endwhile;
 breakpoint;
 
+// loading code from disk to memory
 alias j R7;
 i = 8;
 j = 8;
-while ( i<=14 &&  [PTBR+i] != -1 ) do
-	// loadi([PTBR+i],[INODE_TABLE + inode_index*16 + j]);
-	
+while ( i < 16 &&  [PTBR+i] != -1 ) do
+
 	multipush(R1,R2,R3,R4,R5,R6,R7);
+	alias currPID R2;
 	alias page_num R3;
 	alias block_num R4;
 	func_num = 2;
+	currPID = [SYSTEM_STATUS_TABLE + 1];
 	page_num = [PTBR+i];
 	block_num = [INODE_TABLE + inode_index*16 + j];
 	call DEVICE_MANAGER;
 	multipop(R1,R2,R3,R4,R5,R6,R7);
-
 	i = i + 2;
 	j = j + 1;
 endwhile;

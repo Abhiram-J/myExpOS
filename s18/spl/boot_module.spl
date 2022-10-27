@@ -105,10 +105,10 @@ endwhile;
 
 // setting per process resource table for init
 alias i R0;
-i = ([PROCESS_TABLE + 27] +1)*512 - 16 ;
-while(i < ( [PROCESS_TABLE + 27] +1)*512 ) do
-	[i] = -1;
-	i = i + 2;
+i = 496 ;
+while(i < 512 ) do
+	[80*512 + i] = -1;
+	i = i + 1;
 endwhile;
 
 return;
