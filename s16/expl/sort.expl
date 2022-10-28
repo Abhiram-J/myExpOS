@@ -14,6 +14,7 @@ begin
      	i = i + 1;
     endwhile;
     
+    
     i = 1;j =1;
     while( i < n ) do
     	while ( j < n  ) do
