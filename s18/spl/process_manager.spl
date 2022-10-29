@@ -3,12 +3,12 @@ breakpoint;
 alias func_num R1;
 alias currPID R2;
 
-if ( func_num == 2 ) then
+if ( func_num == FREE_USER_AREA_PAGE ) then
     multipush(R1,R2);
 
     alias func_num R1;
 	alias user_area_page_num R2;
-    func_num = 2;
+    func_num = RELEASE_PAGE;
     user_area_page_num = [PROCESS_TABLE + currPID*16 + 11];
 
     call MEMORY_MANAGER;
@@ -17,20 +17,24 @@ if ( func_num == 2 ) then
 endif;
 
 
-if ( func_num == 3 ) then
-	multipush(R1,R2);
+if ( func_num == EXIT_PROCESS ) then
+	
+    multipush(R1,R2);
+    
     alias func_num R1;
-    func_num = 4;
+    func_num = FREE_PAGE_TABLE;
+
     call PROCESS_MANAGER;
-    func_num = 2;
+    func_num = FREE_USER_AREA_PAGE;
     call PROCESS_MANAGER;
+    
     multipop(R1,R2);
 
     [PROCESS_TABLE + currPID*16 + 4] = TERMINATED;
 	
 endif;
 
-if ( func_num == 4 ) then
+if ( func_num == FREE_PAGE_TABLE ) then
     alias ptbr R3;
     ptbr = [PROCESS_TABLE + 16*currPID + 14]; 
 	[ptbr + 0] = -1; 
@@ -46,7 +50,7 @@ if ( func_num == 4 ) then
 
             alias func_num R1;
 	        alias page_num R2;
-            func_num = 2;
+            func_num = RELEASE_PAGE;
             page_num = [ptbr + i];
 
             call MEMORY_MANAGER;

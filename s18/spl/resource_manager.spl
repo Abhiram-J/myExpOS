@@ -4,7 +4,7 @@ alias func_num R1;
 alias currPID R2;
 alias word R3;
 
-if (func_num == 3) then
+if (func_num == ACQUIRE_DISK) then
 
 	while([DISK_STATUS_TABLE] == 1) do
 		[PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
@@ -20,7 +20,7 @@ if (func_num == 3) then
 
 endif;
 
-if ( func_num == 8 ) then
+if ( func_num == ACQUIRE_TERMINAL ) then
 	
 	while( [TERMINAL_STATUS_TABLE] == 1 ) do
 		[PROCESS_TABLE + currPID*16 + 4] = WAIT_TERMINAL;
@@ -36,7 +36,7 @@ if ( func_num == 8 ) then
 endif;
 
 
-if ( func_num == 9 ) then
+if ( func_num == RELEASE_TERMINAL ) then
 	if ( currPID != [TERMINAL_STATUS_TABLE + 1] ) then
 		R0 = -1;
 		return;

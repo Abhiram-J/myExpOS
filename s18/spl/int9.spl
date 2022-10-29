@@ -1,21 +1,38 @@
 breakpoint;
 
+// saving user stack
+
 alias userSP R0;
 userSP = SP;
+
+
+// switching stack to kernel stack
 
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11]*512 - 1;		//change
 
+
+// adding mode flag for exec sys call
+
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9;
+
+
+// extracting file name from user stack
 
 alias file_name R1;
 file_name = [([PTBR + 2 * (userSP - 4)/ 512] * 512) + ((userSP - 4) % 512)];  // change
+
+
+// checking the inode table for the required file
 
 alias inode_index R6;
 inode_index = 0;
 while( inode_index < MAX_FILE_NUM && [INODE_TABLE + inode_index*16 + 1] != file_name) do
 	inode_index = inode_index + 1;	
 endwhile;
+
+
+// file not found
 
 if ( inode_index == MAX_FILE_NUM || [INODE_TABLE + inode_index*16 + 1] != file_name || [INODE_TABLE + inode_index*16 + 0] != EXEC) then
 	[([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512)] = -1;
@@ -24,28 +41,39 @@ if ( inode_index == MAX_FILE_NUM || [INODE_TABLE + inode_index*16 + 1] != file_n
 	ireturn;
 endif;
 
+
+//  calling exit process
+
 multipush(R0,R1,R2);
 	 
 alias func_num R1;
 alias currPID R2;
-func_num = 3;
+func_num = EXIT_PROCESS;
 currPID = [SYSTEM_STATUS_TABLE + 1];
 	 
 call PROCESS_MANAGER;
 	 
 multipop(R0,R1,R2);
 
+
+// refetching the same user area page
+
 alias user_area_page_num R3;
 user_area_page_num = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
 [MEMORY_FREE_LIST + user_area_page_num] = [MEMORY_FREE_LIST + user_area_page_num] + 1;
 [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+
+// initializing kernel stack of new process
 
 SP = user_area_page_num*512 - 1;
 
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = RUNNING;
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 7] = inode_index;
 
+
 // setting up page table for new process
+
 PTBR = PAGE_TABLE_BASE+20*[SYSTEM_STATUS_TABLE + 1];
 
 //Library
@@ -55,7 +83,7 @@ PTBR = PAGE_TABLE_BASE+20*[SYSTEM_STATUS_TABLE + 1];
 [PTBR+3] = "0100";
 
 multipush(R0);
-func_num = 1;
+func_num = GET_FREE_PAGE;
 
 call MEMORY_MANAGER;
 
@@ -63,21 +91,21 @@ call MEMORY_MANAGER;
 [PTBR+4] = R0;
 [PTBR+5] = "0110";
 
-func_num = 1;
+func_num = GET_FREE_PAGE;
 call MEMORY_MANAGER;
 
 //Heap
 [PTBR+6] = R0;
 [PTBR+7] = "0110";
 
-func_num = 1;
+func_num = GET_FREE_PAGE;
 call MEMORY_MANAGER;
 
 //Stack
 [PTBR+16] = R0;
 [PTBR+17] = "0110";
 
-func_num = 1;
+func_num = GET_FREE_PAGE;
 call MEMORY_MANAGER;
 
 //Stack
@@ -87,6 +115,8 @@ call MEMORY_MANAGER;
 multipop(R0);
 
 
+// calculating the number of blocks blocks_occupied
+
 alias blocks_occupied R4;
 blocks_occupied = [INODE_TABLE + inode_index*16 + 2]/512 + 1;
 
@@ -94,7 +124,7 @@ alias i R5;
 i = 8;
 while( blocks_occupied > 0 ) do
 	multipush(R4,R5);
-	func_num = 1;
+	func_num = GET_FREE_PAGE;
 	call MEMORY_MANAGER;
 	multipop(R4,R5);
 	[PTBR+i] = R0;
@@ -110,7 +140,9 @@ while ( i < 16) do
 endwhile;
 breakpoint;
 
+
 // loading code from disk to memory
+
 alias j R7;
 i = 8;
 j = 8;
@@ -120,15 +152,18 @@ while ( i < 16 &&  [PTBR+i] != -1 ) do
 	alias currPID R2;
 	alias page_num R3;
 	alias block_num R4;
-	func_num = 2;
+
+	func_num = DISK_LOAD;
 	currPID = [SYSTEM_STATUS_TABLE + 1];
 	page_num = [PTBR+i];
 	block_num = [INODE_TABLE + inode_index*16 + j];
 	call DEVICE_MANAGER;
+	
 	multipop(R1,R2,R3,R4,R5,R6,R7);
 	i = i + 2;
 	j = j + 1;
 endwhile;
+
 
 // initializing per process resource table
 
@@ -139,8 +174,8 @@ while(i < ( [PROCESS_TABLE + currPID*16 + 11] +1)*512 ) do
 endwhile;
 
 SP = 8 * 512 ;
-[[PTBR+16] * 512] = [[PTBR+8] * 512 + 1];
-[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+[[PTBR+16] * 512] = [[PTBR+8] * 512 + 1];	// push code starting address to user stack
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;	// resetting mode flag
 
 breakpoint;
 ireturn;

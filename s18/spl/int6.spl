@@ -1,10 +1,19 @@
 breakpoint;
+
+// setting mod flag to read sys call
+
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 7;
 alias userSP R0;
 userSP = SP;
 
+
+// switching stack
+
 [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE + 1] + 13] = SP;
 SP = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE + 1] + 11]* 512 - 1;
+
+
+// extracting word name from user stack
 
 alias physicalPageNum R1;
 alias offset R2;
@@ -14,6 +23,7 @@ offset = (userSP - 4) % 512;
 fileDescPhysicalAddr = (physicalPageNum * 512) + offset;
 alias fileDescriptor R4;
 fileDescriptor=[fileDescPhysicalAddr];
+
 
 if (fileDescriptor != -1) then
 	 alias physicalAddrRetVal R5;
@@ -41,7 +51,13 @@ else
 	 [physicalAddrRetVal] = 0;
 endif;
 
+
+// switching stack back to user stack
+
 SP = userSP;
+
+// resetting mod flag 
+
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
 
 breakpoint;

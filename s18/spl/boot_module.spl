@@ -76,6 +76,7 @@ PTBR = PAGE_TABLE_BASE+20;
 
 
 // setting all other states as terminated
+
 alias pid R0;
 pid = 2;
 while ( pid < 16) do
@@ -83,7 +84,14 @@ while ( pid < 16) do
 	pid = pid +1;
 endwhile;
 
+
+// initializing terminal status table and disk status table
+
 [TERMINAL_STATUS_TABLE] = 0;
+[DISK_STATUS_TABLE] = 0;
+
+
+// initializing memory free list
 
 alias page R0;
 page = 76 ;
@@ -98,12 +106,14 @@ while(page < 128) do
     page = page + 1;
 endwhile;
 
+// initializing mem free count and wait mem count
+
 [SYSTEM_STATUS_TABLE + 2] = 45;
 [SYSTEM_STATUS_TABLE + 3] = 0;
 
-[DISK_STATUS_TABLE] = 0;
 
 // setting per process resource table for init
+
 alias i R0;
 i = 496 ;
 while(i < 512 ) do

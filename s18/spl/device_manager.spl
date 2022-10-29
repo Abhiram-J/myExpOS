@@ -3,13 +3,13 @@ breakpoint;
 alias func_num R1;
 alias currPID R2;
 
-if ( func_num == 2) then
+if ( func_num == DISK_LOAD) then
 	alias page_num R3;
 	alias block_num R4;
 
 	// acquire disk
 	multipush(R1,R2,R3,R4);
-	func_num = 3;
+	func_num = ACQUIRE_DISK;
 
 	call RESOURCE_MANAGER;
 
@@ -29,12 +29,12 @@ if ( func_num == 2) then
 endif;
 
 
-if ( func_num == 3 ) then
+if ( func_num == TERMINAL_WRITE ) then
 	// acquire terminal
 	alias word R3;
 	
 	multipush(R1,R2);
-	func_num = 8;
+	func_num = ACQUIRE_TERMINAL;
 	call RESOURCE_MANAGER;
 	multipop(R1,R2);
 	print word;
@@ -42,18 +42,19 @@ if ( func_num == 3 ) then
 	// release terminal
 	
 	multipush(R1,R2);
-	func_num = 9;
+	func_num = RELEASE_TERMINAL;
 	call RESOURCE_MANAGER;
 	multipop(R1,R2);
 
 endif;
 
 
-if ( func_num == 4 ) then
+if ( func_num == TERMINAL_READ ) then
+
 	// acquire terminal
 	alias word_addr R3;
 	multipush(R1,R2,R3);
-	func_num = 8;
+	func_num = ACQUIRE_TERMINAL;
 	call RESOURCE_MANAGER;
 	multipop(R1,R2,R3);
 	read;

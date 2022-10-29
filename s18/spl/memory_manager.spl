@@ -3,7 +3,7 @@ breakpoint;
 alias func_num R1;
 alias page_num R2;
 
-if ( func_num == 1 ) then
+if ( func_num == GET_FREE_PAGE ) then
     [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
 
     while( [SYSTEM_STATUS_TABLE + 2] == 0 ) do
@@ -27,7 +27,7 @@ if ( func_num == 1 ) then
 endif;
 
 
-if ( func_num == 2 ) then
+if ( func_num == RELEASE_PAGE ) then
 	[MEMORY_FREE_LIST + page_num] = [MEMORY_FREE_LIST + page_num] - 1;
 
     if ([MEMORY_FREE_LIST + page_num] == 0) then
