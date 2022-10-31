@@ -1,0 +1,13 @@
+int main()
+{
+decl
+    int temp;
+enddecl
+begin
+    while (1>0) do
+        temp = 1;
+        //temp = exposcall("Write", -2 , "idle");
+    endwhile;
+    return 0;
+end
+}

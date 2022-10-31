@@ -1,0 +1,169 @@
+//Fork system call
+
+alias userSP R1;
+userSP = SP;
+
+[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 9] = 8;
+[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 13] = SP;
+SP = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 11]*512 -1;
+
+// call get pcb entry
+multipush(R1, R2, R3, R4);
+R1 = GET_PCB_ENTRY;
+call PROCESS_MANAGER;
+multipop(R1, R2, R3, R4);
+
+alias childPID R0;
+if( childPID == -1 ) then
+	alias ret R2;
+	ret = ( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
+	[ret] = -1;
+	[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 9] = 0;
+	ireturn;
+endif;
+
+
+//Check if heap is present or not
+
+if( [PTBR + 4] == -1 ) then
+	//call get free page to get the heap pages
+	multipush(R1, R2, R3, R4, R5);
+	R1 = GET_FREE_PAGE;
+	call MEMORY_MANAGER;
+	[PTBR + 4] = R10;
+	[PTBR + 5] = "0110";
+	multipop( R1, R2, R3, R4, R5);
+
+	multipush( R1, R2, R3, R4, R5);
+	R1 = GET_FREE_PAGE;
+	call MEMORY_MANAGER;
+	[PTBR + 6] = R10;
+	[PTBR + 7] = "0110";
+	multipop(R1, R2, R3, R4, R5);
+
+endif;
+
+//get the stack and user area page of child process
+//here the auxiliary info is just a placeholder value - correct value will be set below
+alias childPTBR R2;
+childPTBR = PAGE_TABLE_BASE + childPID*20;
+alias childProcessTable R5;
+childProcessTable = PROCESS_TABLE + 16*childPID;
+
+//setting up the stack of the child process
+multipush(R1, R2, R3, R4, R5);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+[childPTBR + 16] = R0;
+multipop(R1, R2, R3, R4, R5);
+
+multipush(R1, R2, R3, R4, R5);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+[childPTBR + 18] = R0;
+multipop(R1, R2, R3, R4, R5);
+
+//setting up the user area page for child process
+multipush(R1, R2, R3, R4, R5);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+multipop( R1, R2, R3, R4, R5);
+
+
+[childProcessTable + 11] = R0;
+
+
+//initialise the process table of child
+
+[childProcessTable + 1] = [PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 1]; // user id
+[childProcessTable + 6] = [PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 6]; // swap flag
+[childProcessTable + 10] = [PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 10];  // user area swap status
+[childProcessTable + 7] = [PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 7]; // inode index
+[childProcessTable + 13] = [PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 13]; // uptr
+[childProcessTable + 9] = 0; // mode flag
+[childProcessTable + 12] = 0; // kptr
+[childProcessTable + 0] = 0; // tick
+
+[childProcessTable + 2] = [SYSTEM_STATUS_TABLE+1];  // ppid = parents pid
+[childProcessTable + 4] = CREATED;
+
+//user area page is alread set at line number 79
+//pid, ptbr and ptrlr are set inside the get pcb entry function
+//input buffer no need to initialize
+
+//copy the per process resource table to the child process
+
+alias i R3;
+i = 0;
+while( (i < 16) ) do
+	[[childProcessTable + 11]*512 + 511 - i] = [[PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 11]*512 + 511 - i];
+	i = i + 1;
+endwhile;
+
+//copy the per process disk map table of parent to child
+
+i = 2;
+while( (i <= 7) ) do
+	[DISK_MAP_TABLE + childPID*10 + i] = [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10 + i];
+	i = i + 1;
+endwhile;
+
+//user area page and stack are invalid for child
+
+[DISK_MAP_TABLE + childPID*10 + 0] = -1;
+[DISK_MAP_TABLE + childPID*10 + 1] = -1;
+[DISK_MAP_TABLE + childPID*10 + 8] = -1;
+[DISK_MAP_TABLE + childPID*10 + 9] = -1;
+
+
+//Initialize the page table of child
+
+i = 0;
+while( (i <= 7) ) do
+	[childPTBR + i*2] = [PTBR + i*2];
+	[MEMORY_FREE_LIST + [childPTBR + i*2]] = 1 + [MEMORY_FREE_LIST + [childPTBR + i*2]];
+	[childPTBR + i*2+1] = [PTBR + i*2+1];
+	i = i + 1;
+endwhile;
+
+
+//stack pages were assigned in line number: 56
+//but the auxiliarly inforamation should be same as parent
+
+[childPTBR + 8*2 + 1] = [PTBR + 8*2 + 1];
+[childPTBR + 9*2 + 1] = [PTBR + 9*2 + 1];
+
+// copy the content of user stack 
+i = 0;
+while( i < 512 ) do
+	[[childPTBR + 8*2]*512 + i] = [[PTBR + 8*2]*512 + i];
+	[[childPTBR + 9*2]*512 + i] = [[PTBR + 9*2]*512 + i];
+	i = i + 1;
+endwhile;
+
+
+//store value in BP to top of kernel stack of child process
+
+i = [childProcessTable + 12]*512-1;
+i = i + 1;
+[i] = BP;
+
+
+//set up the return value in parent
+
+alias ret R2;
+ret = ( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
+[ret] = childPID;
+
+//set up the return value in child
+
+//ret = ( [childPTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
+ret = ( [[childProcessTable + 14] + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
+[ret] = 0;
+
+
+//switch to user stack of parent
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+ireturn;
