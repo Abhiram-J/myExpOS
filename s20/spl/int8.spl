@@ -108,6 +108,7 @@ while( (i <= 7) ) do
 	i = i + 1;
 endwhile;
 
+
 //user area page and stack are invalid for child
 
 [DISK_MAP_TABLE + childPID*10 + 0] = -1;

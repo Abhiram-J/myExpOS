@@ -1,47 +1,70 @@
 type
-	list
-	{
-		int data;
-		list next;
-	}
+List
+{
+    int data;
+    List next;
+}
 endtype
-
+            
+decl
+    List head;
+    int x, pid, temp, length;
+enddecl
+            
 int main()
 {
-	decl
-		int n,x,i,temp;
-		list head, ptr, curr;
-	enddecl
-	begin
-		temp = initialize();
-		temp = exposcall("Write", -2, "Enter n :");
-		temp = exposcall("Read", -1, n);
-		i = 0;
-		head = null;
-		while( i < n ) do
-			temp = exposcall("Read", -1, x);
-			ptr = alloc();
-			ptr.data = x;
-			ptr.next = null;
-			if( head == null ) then
-				head = ptr;
-			else
-				curr = head;
-				while ( curr.next != null ) do
-					curr = curr.next;
-				endwhile;
-				curr.next = ptr;
-			endif;
-			i = i + 1;
-		endwhile;
-		ptr = head;
-		i = 0;
-		temp = exposcall("Write", -2, "Linked List :");
-		while( (i < n) ) do
-			temp = exposcall("Write", -2, ptr.data);
-			ptr = ptr.next;
-			i = i + 1;
-		endwhile;
-		return 0;
-	end
+decl
+    List p, q;
+    int i;
+enddecl
+            
+begin
+    temp = exposcall("Heapset");
+    head = null;
+    q = head;
+
+    length=1;
+    while (length <= 100)  do
+        p = exposcall("Alloc",2);
+        p.data = length;
+        p.next = null;
+        
+        if (head == null) then
+            head = p;
+            q = p;
+        else
+            q.next = p;
+            q = q.next;
+        endif;
+                          
+        length = length+1;
+    endwhile;
+                      
+    pid = exposcall("Fork");
+    if(pid == 0) then
+        p = head;
+        while(p != null)  do
+            x = p.data;
+            temp = exposcall("Write",-2,x);
+            p = p.next;
+            if(p == null) then
+                break;
+            endif;
+            p = p.next;
+        endwhile;
+    else
+        q = head.next;
+        while(q != null)  do
+            x = q.data;
+            temp = exposcall("Write",-2,x);
+            q = q.next;
+            if(q == null) then
+                break;
+            endif;
+            q = q.next;
+        endwhile;
+    endif;
+                
+    return 0;
+end
 }
