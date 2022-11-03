@@ -1,0 +1,143 @@
+loadi(65,7);    // init code
+loadi(66,8);
+loadi(22,35);   // int10
+loadi(23,36);
+loadi(2, 15);	// exception handler
+loadi(3, 16);
+loadi(63,13);	// library
+loadi(64,14);
+loadi(4, 17);	// timer interrupt
+loadi(5, 18);
+loadi(16,29);	// int7	
+loadi(17,30);
+loadi(50,63);	// scheduler	
+loadi(51,64);
+loadi(40,53);	// resource_module	
+loadi(41,54);
+loadi(48,61);	// device_manager	
+loadi(49,62);
+loadi(8,21);	// console_int_handler	
+loadi(9,22);
+loadi(14,27);	// int6	
+loadi(15,28);
+loadi(20,33);	// int9	
+loadi(21,34);
+loadi(42,55);	// process_manager	
+loadi(43,56);
+loadi(44,57);	// memory_manager
+loadi(45,58);
+loadi(59,3);	// inode_table	
+loadi(60,4);
+loadi(6,19);	// disk_int_handler	
+loadi(7,20);
+loadi(2,15);	// exception_handler   
+loadi(3,16);
+loadi(18,31);	// int8
+loadi(19,32);
+loadi(24,37);	// int11
+loadi(25,38);
+loadi(32,45);	// int15
+loadi(33,46);
+
+// setting up page table for init process
+PTBR = PAGE_TABLE_BASE+20;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = 78;
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
+
+//Code
+[PTBR+8] = 65;
+[PTBR+9] = "0100";
+[PTBR+10] = 66;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 76;
+[PTBR+17] = "0110";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
+
+
+// init
+[PROCESS_TABLE + 17] = 1;
+[PROCESS_TABLE + 20] = CREATED;
+[PROCESS_TABLE + 27] = 80;
+[PROCESS_TABLE + 28] = 0;
+[PROCESS_TABLE + 29] = 8*512;
+[PROCESS_TABLE + 30] = PAGE_TABLE_BASE+20;
+[PROCESS_TABLE + 31] = 10;
+
+[76 * 512] = [65 * 512 + 1];
+
+// initializing disk map entry for init process
+[DISK_MAP_TABLE + 10*1 + 0] = 80; //user are page
+[DISK_MAP_TABLE + 10*1 + 1] = -1;
+[DISK_MAP_TABLE + 10*1 + 2] = 78; //Heap
+[DISK_MAP_TABLE + 10*1 + 3] = 79;
+[DISK_MAP_TABLE + 10*1 + 4] = 65; //code
+[DISK_MAP_TABLE + 10*1 + 5] = 66;
+[DISK_MAP_TABLE + 10*1 + 6] = -1;
+[DISK_MAP_TABLE + 10*1 + 7] = -1;
+[DISK_MAP_TABLE + 10*1 + 8] = 76; //stack
+[DISK_MAP_TABLE + 10*1 + 9] = 77;
+
+// setting all other states as terminated
+
+alias pid R0;
+pid = 2;
+while ( pid < 16) do
+	[PROCESS_TABLE + pid*16 + 4] = TERMINATED;
+	pid = pid +1;
+endwhile;
+
+
+// initializing terminal status table and disk status table
+
+[TERMINAL_STATUS_TABLE] = 0;
+[DISK_STATUS_TABLE] = 0;
+
+
+// initializing memory free list
+
+alias page R0;
+page = 76 ;
+
+while(page <= 82) do
+	[MEMORY_FREE_LIST + page] = 1;
+	page = page + 1;
+endwhile;
+
+while(page < 128) do
+	[MEMORY_FREE_LIST + page] = 0;
+    page = page + 1;
+endwhile;
+
+// initializing mem free count and wait mem count
+
+[SYSTEM_STATUS_TABLE + 2] = 45;
+[SYSTEM_STATUS_TABLE + 3] = 0;
+
+
+// setting per process resource table for init
+
+alias i R0;
+i = 496 ;
+while(i < 512 ) do
+	[80*512 + i] = -1;
+	i = i + 1;
+endwhile;
+
+return;
