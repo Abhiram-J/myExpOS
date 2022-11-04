@@ -10,7 +10,20 @@ backup;
 multipush(EIP);
 
 if( (EC != 0) || ([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] == (PTLR*512-1)) ) then
-	print "Stack Overflow";
+	if(EC == 1) then
+		print "IllegalIns";
+		print EIP;
+	endif;
+	if(EC == 2) then
+		print "IllegalMem";
+	endif;
+	if(EC == 3) then
+		print "ArithmeticEp";
+	endif;
+	if([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] == (PTLR*512-1)) then
+		print "StackOver";
+	endif;
+	
 
 	//invoke exit process function
 

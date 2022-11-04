@@ -23,5 +23,7 @@ cd $HOME/myexpos/spl
 ./spl spl_progs/disk_int_handler.spl
 ./spl spl_progs/exception_handler.spl
 ./spl spl_progs/int8.spl
+./spl spl_progs/int11.spl
+./spl spl_progs/int15.spl
 cd $HOME/myexpos/xfs-interface
 ./xfs-interface run batch

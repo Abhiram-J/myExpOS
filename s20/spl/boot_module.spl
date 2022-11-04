@@ -34,6 +34,10 @@ loadi(2,15);	// exception_handler
 loadi(3,16);
 loadi(18,31);	// int8
 loadi(19,32);
+loadi(24,37);	// int11
+loadi(25,38);
+loadi(32,45);	// int15
+loadi(33,46);
 
 // setting up page table for init process
 PTBR = PAGE_TABLE_BASE+20;

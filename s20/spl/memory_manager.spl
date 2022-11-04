@@ -18,7 +18,7 @@ if ( func_num == GET_FREE_PAGE ) then
     
     alias free_page R0;
     free_page = 76;
-    while([MEMORY_FREE_LIST + free_page] == 1) do
+    while([MEMORY_FREE_LIST + free_page] >= 1) do
         free_page = free_page + 1;
     endwhile;
     [MEMORY_FREE_LIST + free_page] = 1;
