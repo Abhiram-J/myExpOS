@@ -34,13 +34,13 @@ if([new_process_table + 4] == CREATED) then
 	SP = [new_process_table + 13];
 	[new_process_table + 4] = RUNNING;
 	[new_process_table + 9] = 0;
-	print [SYSTEM_STATUS_TABLE + 1];
+	// print [SYSTEM_STATUS_TABLE + 1];
 	ireturn;
 endif;
 
 [new_process_table + 4] = RUNNING;
 multipop(BP);
 // print "newproc";
-print [SYSTEM_STATUS_TABLE + 1];
+// print [SYSTEM_STATUS_TABLE + 1];
 breakpoint;
 return;

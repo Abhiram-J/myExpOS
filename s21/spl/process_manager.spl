@@ -26,6 +26,7 @@ if ( func_num == GET_PCB_ENTRY ) then
 	[PROCESS_TABLE + currPID*16 + 15] = 10;
 	R0 = currPID;
     
+    breakpoint;
 	return;
 
 endif;
@@ -41,10 +42,15 @@ if ( func_num == FREE_USER_AREA_PAGE ) then
     call MEMORY_MANAGER;
 
     multipop(R1,R2);
+
+    breakpoint;
+    return;
+
 endif;
 
 
 if ( func_num == EXIT_PROCESS ) then
+    // print "exit";
 	if( [PROCESS_TABLE + currPID*16 + 9] != 9 ) then
 		// not comming from exec sys call
 		alias i R3;
@@ -66,12 +72,18 @@ if ( func_num == EXIT_PROCESS ) then
     func_num = FREE_PAGE_TABLE;
 
     call PROCESS_MANAGER;
+    multipop(R1,R2);
+
+    multipush(R1,R2);
     func_num = FREE_USER_AREA_PAGE;
     call PROCESS_MANAGER;
     
     multipop(R1,R2);
 
     [PROCESS_TABLE + currPID*16 + 4] = TERMINATED;
+
+    breakpoint;
+    return;
 	
 endif;
 
@@ -97,6 +109,8 @@ if ( func_num == FREE_PAGE_TABLE ) then
             call MEMORY_MANAGER;
 
             multipop(R1,R2,R3,R4);
+            // print "aagaya";
+            [ptbr + i] = -1;
             [ptbr + i + 1] = "0000";
         endif;
         i = i + 2;

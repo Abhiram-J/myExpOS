@@ -1,6 +1,7 @@
 //Fork system call
+breakpoint;
 
-alias userSP R1;
+alias userSP R0;
 userSP = SP;
 
 [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 9] = 8;
@@ -8,12 +9,13 @@ userSP = SP;
 SP = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 11]*512 -1;
 
 // call get pcb entry
-multipush(R1, R2, R3, R4);
+multipush(R0);
 R1 = GET_PCB_ENTRY;
 call PROCESS_MANAGER;
-multipop(R1, R2, R3, R4);
+R1 = R0;
+multipop(R0);
 
-alias childPID R0;
+alias childPID R1;
 if( childPID == -1 ) then
 	alias ret R2;
 	ret = ( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
@@ -27,50 +29,52 @@ endif;
 
 if( [PTBR + 4] == -1 ) then
 	//call get free page to get the heap pages
-	multipush(R1, R2, R3, R4, R5);
+	multipush(R0,R1);
 	R1 = GET_FREE_PAGE;
 	call MEMORY_MANAGER;
-	[PTBR + 4] = R10;
+	[PTBR + 4] = R0;
 	[PTBR + 5] = "0110";
-	multipop( R1, R2, R3, R4, R5);
+	multipop(R0, R1);
 
-	multipush( R1, R2, R3, R4, R5);
+	multipush(R0, R1);
 	R1 = GET_FREE_PAGE;
 	call MEMORY_MANAGER;
-	[PTBR + 6] = R10;
+	[PTBR + 6] = R0;
 	[PTBR + 7] = "0110";
-	multipop(R1, R2, R3, R4, R5);
+	multipop(R0, R1);
 
 endif;
 
 //get the stack and user area page of child process
 //here the auxiliary info is just a placeholder value - correct value will be set below
+
 alias childPTBR R2;
 childPTBR = PAGE_TABLE_BASE + childPID*20;
 alias childProcessTable R5;
 childProcessTable = PROCESS_TABLE + 16*childPID;
 
 //setting up the stack of the child process
-multipush(R1, R2, R3, R4, R5);
+multipush(R0,R1, R2, R3, R4, R5);
 R1 = GET_FREE_PAGE;
 call MEMORY_MANAGER;
 [childPTBR + 16] = R0;
-multipop(R1, R2, R3, R4, R5);
+multipop(R0,R1, R2, R3, R4, R5);
 
-multipush(R1, R2, R3, R4, R5);
+multipush(R0,R1, R2, R3, R4, R5);
 R1 = GET_FREE_PAGE;
 call MEMORY_MANAGER;
 [childPTBR + 18] = R0;
-multipop(R1, R2, R3, R4, R5);
+multipop(R0,R1, R2, R3, R4, R5);
 
 //setting up the user area page for child process
-multipush(R1, R2, R3, R4, R5);
+multipush(R0,R1, R2, R3, R4, R5);
 R1 = GET_FREE_PAGE;
 call MEMORY_MANAGER;
-multipop( R1, R2, R3, R4, R5);
+R6 = R0; 
+multipop(R0, R1, R2, R3, R4, R5);
 
 
-[childProcessTable + 11] = R0;
+[childProcessTable + 11] = R6;
 
 
 //initialise the process table of child
@@ -95,7 +99,7 @@ multipop( R1, R2, R3, R4, R5);
 
 alias i R3;
 i = 0;
-while( (i < 16) ) do
+while( i < 16 ) do
 	[[childProcessTable + 11]*512 + 511 - i] = [[PROCESS_TABLE + (16*[SYSTEM_STATUS_TABLE+1]) + 11]*512 + 511 - i];
 	i = i + 1;
 endwhile;
@@ -152,7 +156,7 @@ i = i + 1;
 
 //set up the return value in parent
 
-alias ret R2;
+alias ret R6;
 ret = ( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
 [ret] = childPID;
 
@@ -166,5 +170,7 @@ ret = ( [[childProcessTable + 14] + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
 //switch to user stack of parent
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+breakpoint;
 
 ireturn;

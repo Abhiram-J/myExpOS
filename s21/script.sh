@@ -18,7 +18,7 @@ cd $HOME/myexpos/spl
 ./spl spl_progs/console_int_handler.spl
 ./spl spl_progs/int6.spl
 ./spl spl_progs/int9.spl
-# ./spl spl_progs/process_manager.spl
+./spl spl_progs/process_manager.spl
 ./spl spl_progs/memory_manager.spl
 ./spl spl_progs/disk_int_handler.spl
 ./spl spl_progs/exception_handler.spl

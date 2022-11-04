@@ -1,4 +1,5 @@
 //int11 -> Wait, Signal, Getpid, Getppid
+breakpoint;
 
 alias userSP R0;
 userSP = SP;
@@ -89,4 +90,7 @@ if( sysCallNum == INT_SIGNAL ) then
 endif;
 
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+
+breakpoint;
+
 ireturn;

@@ -1,17 +1,24 @@
 int main()
 {
 	decl
-		int temp;
+		int temp,pid;
 	enddecl
 
 	begin
 		temp = exposcall("Write" , -2 , "Before");
-		temp = exposcall ("Fork");
-		if(temp == 0) then
-			temp = exposcall("Exec", "odd.xsm");
-		else
-			temp = exposcall("Exec", "even.xsm");
-		endif;
+		pid = exposcall ("Fork");
+		temp = exposcall("Write" , -2 , pid);
+		pid = exposcall ("Fork");
+		temp = exposcall("Write" , -2 , pid);	
+		pid = exposcall ("Fork");
+		temp = exposcall("Write" , -2 , pid);	
+		pid = exposcall ("Fork");
+		temp = exposcall("Write" , -2 , pid);		
+		// if(pid == 0) then
+		// 	temp = exposcall("Exec", "odd.xsm");
+		// else
+		// 	temp = exposcall("Exec", "even.xsm");
+		// endif;
 		return 0;
 	end
 }
