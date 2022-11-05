@@ -7,18 +7,24 @@ int main()
 	begin
 		
 		pid1 = exposcall("Fork");
-		pid2 = exposcall("Fork");
+		pid2 = exposcall("Fork"); 
 		pid3 = exposcall("Fork");
 		if( pid1 == 0) then
 			tmp = exposcall("Exec", "pid.xsm");
+		else 
+			tmp = exposcall("Wait", pid1);
 		endif;
 
 		if( pid2 == 0) then
 			tmp = exposcall("Exec", "pid.xsm");
+		else
+			tmp = exposcall("Wait", pid2);
 		endif;
 
 		if( pid3 == 0) then
 			tmp = exposcall("Exec", "pid.xsm");
+		else
+			tmp = exposcall("Wait", pid3);
 		endif;
         
 		return 0;

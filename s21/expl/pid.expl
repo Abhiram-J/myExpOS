@@ -1,8 +1,7 @@
 int main()
 {
 	decl
-		int pid;
-		int tmp;
+		int tmp,pid;
 	enddecl
 	
 	begin

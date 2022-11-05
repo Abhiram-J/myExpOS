@@ -3,9 +3,8 @@
 cd $HOME/myexpos/expl
 ./expl expl_progs/idle.expl
 ./expl expl_progs/shell.expl
-./expl expl_progs/odd.expl
-./expl expl_progs/ll.expl
-./expl expl_progs/fork.expl
+./expl expl_progs/pid.expl
+./expl expl_progs/pid2.expl
 cd $HOME/myexpos/spl
 ./spl spl_progs/os_startup.spl
 ./spl spl_progs/timer.spl

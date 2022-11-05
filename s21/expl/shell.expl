@@ -8,11 +8,9 @@ begin
     a=1;
     curr = 0;
     while(a == 1) do
-        // if( curr == 1 ) then
-        //     continue;
-        // endif;
+       
         temp = exposcall("Write",-2,"---Enter---");
-        temp = exposcall("Read",-1, input);
+        temp = exposcall("Read",-1, input); 
 
         if( input == "Shutdown"  ) then
             temp = exposcall("Shutdown");
@@ -26,7 +24,6 @@ begin
         endif;
         if(pid != 0) then
             temp = exposcall("Wait",pid);
-            // curr = 1;
         else
             temp = exposcall("Exec",input);
             if(temp != 0) then
