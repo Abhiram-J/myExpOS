@@ -1,0 +1,133 @@
+breakpoint;
+
+alias userSP R0;
+userSP = SP;
+
+//switch to kernel stack
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+
+//extract the sys call number
+
+alias sysCallNum R1;
+sysCallNum = [ ( [PTBR + 2*((userSP-5)/512)]*512 ) + (userSP-5)%512 ];
+
+
+// Semlock
+
+if ( sysCallNum == INT_SEMLOCK ) then
+
+    //argument = Semaphore Descriptor
+
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 19;
+	
+    alias semDes R2;
+	semDes = [ ( [PTBR + 2*((userSP-4)/512)]*512 ) + (userSP-4)%512 ];
+	
+    if( (semDes < 0) || (semDes > 7) || ([ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] != SEMAPHORE) ) then
+		//semaphore description is invalid
+		//return -1
+
+		[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = -1;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+		SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+		ireturn;
+	
+    endif;
+
+
+	alias semTableIdx R3;
+	semTableIdx = [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes + 1];
+
+	while( ([SEMAPHORE_TABLE + 4*semTableIdx + 0] != [SYSTEM_STATUS_TABLE+1]) && ([SEMAPHORE_TABLE + 4*semTableIdx + 0] != -1) ) do
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_SEMAPHORE;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] = semTableIdx;
+		
+        multipush(R0, R1, R2, R3, R4, R5);
+		call SCHEDULER;
+		multipop(R0, R1, R2, R3, R4, R5);
+	
+    endwhile;
+
+	//we got the semaphore for locking
+	//return 0
+	
+    [SEMAPHORE_TABLE + 4*semTableIdx + 0] = [SYSTEM_STATUS_TABLE+1];
+
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+	[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = 0;
+	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+	ireturn;
+endif;
+
+
+// Semunlock
+
+if ( sysCallNum == INT_SEMUNLOCK ) then
+
+    //argument = Semaphore Descriptor
+	
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 20;
+	
+    alias semDes R2;
+	semDes = [ ( [PTBR + 2*((userSP-4)/512)]*512 ) + (userSP-4)%512 ];
+	
+    if( (semDes < 0) || (semDes > 7) || ([ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] != SEMAPHORE) ) then
+		//semaphore description is invalid
+		//return -1
+		
+        [( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = -1;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+		SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+		ireturn;
+	
+    endif;
+	
+    alias semTableIdx R3;
+	semTableIdx = [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes + 1];
+	
+    if( ([SEMAPHORE_TABLE + 4*semTableIdx + 0] != -1) ) then
+		if( ([SEMAPHORE_TABLE + 4*semTableIdx + 0] != [SYSTEM_STATUS_TABLE+1]) ) then
+			//locked by some other process
+			//return -2
+			
+            [( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = -2;
+			[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+			SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+			ireturn;
+		
+        endif;
+		
+        //we are here means the current process had the semaphore
+		//and now wer are unlocking it
+		
+        [SEMAPHORE_TABLE + 4*semTableIdx + 0] = -1;
+		alias i R4;
+		i = 1;
+		
+        while( i < 16 ) do
+			if([PROCESS_TABLE + i*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + i*16 + 5] == semTableIdx) then
+				[PROCESS_TABLE + i*16 + 4] = READY;
+			endif;
+			i = i + 1;
+		endwhile;
+	
+    endif;
+	
+    //success
+    
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+	[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = 0;
+	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+	ireturn;
+endif;
+
+
+
+
+breakpoint;
+ireturn;
