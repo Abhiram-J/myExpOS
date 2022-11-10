@@ -42,6 +42,9 @@ loadi(30,43);	// int14
 loadi(31,44);
 loadi(32,45);	// int15
 loadi(33,46);
+loadi(10,23);	// int4
+loadi(11,24);
+
 
 // setting up page table for init process
 PTBR = PAGE_TABLE_BASE+20;
@@ -77,6 +80,7 @@ PTBR = PAGE_TABLE_BASE+20;
 
 // init
 [PROCESS_TABLE + 17] = 1;
+[PROCESS_TABLE + 19] = 1;
 [PROCESS_TABLE + 20] = CREATED;
 [PROCESS_TABLE + 27] = 80;
 [PROCESS_TABLE + 28] = 0;
@@ -149,14 +153,35 @@ alias i R0;
 i = 496 ;
 while(i < 512 ) do
 	[80*512 + i] = -1;
+	[80*512 + i + 1] = -1;
 	i = i + 1;
 endwhile;
 
+//initialize semaphore table
 i = 0;
 while ( i < MAX_SEM_COUNT ) do
 	[SEMAPHORE_TABLE + i*4 + 0] = -1;
 	[SEMAPHORE_TABLE + i*4 + 1] = 0;
 	i = i + 1;
 endwhile;
+
+//initialize file status table
+
+i = 0;
+while( i < MAX_FILE_NUM ) do
+	[FILE_STATUS_TABLE + i*4 + 0] = -1;
+	[FILE_STATUS_TABLE + i*4 + 1] = -1;
+	i = i + 1;
+endwhile;
+
+//initialize buffer table
+i = 0;
+while( i < MAX_BUFFER ) do
+	[BUFFER_TABLE + i*4 + 0] = -1;
+	[BUFFER_TABLE + i*4 + 1] = 0;
+	[BUFFER_TABLE + i*4 + 2] = -1;
+	i = i + 1;
+endwhile;
+
 
 return;

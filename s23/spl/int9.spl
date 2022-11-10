@@ -78,6 +78,7 @@ alias i R5;
 i = 496 ;
 while(i < 512 ) do
 	[user_area_page_num*512 + i] = -1;
+	[user_area_page_num*512 + i + 1] = -1;
 	i = i + 1;
 endwhile;
 

@@ -1,0 +1,143 @@
+breakpoint;
+
+alias userSP R0;
+userSP = SP;
+
+//switch to kernel stack
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+
+//extract the sys call number
+
+alias sysCallNum R1;
+sysCallNum = [ ( [PTBR + 2*((userSP-5)/512)]*512 ) + (userSP-5)%512 ];
+
+// Semget
+
+if ( sysCallNum == INT_SEMGET ) then
+
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 17;
+
+	//find a free entry in per process resources table
+	//this will be our semphore descriptor - what is a semaphore descriptor?
+	alias semDes R2;
+	semDes = 0;
+
+	while( semDes < 8 ) do
+		if( [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] == -1 ) then
+			[ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] = SEMAPHORE;
+			break;
+		endif;
+		semDes = semDes + 1;
+	endwhile;
+	if( semDes == 8 ) then
+		//couldnt find free place in per process resource table
+		//return -1
+        
+		[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = -1;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+		SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+		ireturn;
+
+	endif;
+
+	//We are here means we got a position in per process resource table
+	//now user acquire_semaphore() to get a entry from semaphore table
+
+	multipush(R0, R1, R2);
+
+	R1 = ACQUIRE_SEMAPHORE;
+	R2 = [SYSTEM_STATUS_TABLE+1];
+	call RESOURCE_MANAGER;
+	R10 = R0;
+
+	multipop(R0, R1, R2);
+
+
+	if( R10 == -1 ) then
+		//no free semaphore
+		//return -2
+		
+        [( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = -2;
+		
+        //can release the per process resource table entry
+		
+        [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] = -1;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+		SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+		ireturn;
+
+	endif;
+
+	//we are here means Semaphore table has got a free entry
+	//store idx of semaphore table into per process resource table
+	//return per process resource table idx
+
+	[ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes + 1] = R10;
+	[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = semDes;
+
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+	[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = 0;
+	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+	ireturn;
+endif;
+
+
+// Sem release
+
+if ( sysCallNum == INT_SEMRELEASE ) then
+
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 18;
+
+	alias semDes R2;
+	semDes = [ ( [PTBR + 2*((userSP-4)/512)]*512 ) + (userSP-4)%512 ];
+
+	if( (semDes < 0) || (semDes > 7) || [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] != SEMAPHORE ) then
+		//semaphore description is invalid
+		//return -1
+		
+        [( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = -1;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+		SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+		
+        ireturn;
+	
+    endif;
+	
+    
+    //call release_semaphore() function
+	
+    multipush(R0, R1, R2);
+	
+    R1 = RELEASE_SEMAPHORE;
+	R2 = [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes +1];
+	R3 = [SYSTEM_STATUS_TABLE + 1];
+	
+	call RESOURCE_MANAGER;
+    multipop(R0, R1, R2);
+	
+    //invalidate the per process resource table entry
+	
+    [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes] = -1;
+    [ [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + 496 + 2*semDes + 1] = -1;
+
+	
+    //return 0
+
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+	[( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512] = 0;
+	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+	ireturn;
+
+endif;
+
+
+
+
+breakpoint;
+ireturn;

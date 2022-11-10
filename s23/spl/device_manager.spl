@@ -3,6 +3,44 @@ breakpoint;
 alias func_num R1;
 alias currPID R2;
 
+
+if( func_num == DISK_STORE ) then
+
+	//arguments: currPID, PageNumber, Blocknumber
+
+	alias page R3;
+	alias block R4;
+
+	//acquire the disk
+
+	multipush(R0, R1, R2, R3, R4);
+	R1 = ACQUIRE_DISK;
+	call RESOURCE_MANAGER;
+	multipop(R0, R1, R2, R3, R4);
+
+	//set the parameters of disk status table
+
+	[DISK_STATUS_TABLE + 0] = 1; //busy
+	[DISK_STATUS_TABLE + 1] = 1; //load or store bit
+	[DISK_STATUS_TABLE + 2] = page;
+	[DISK_STATUS_TABLE + 3] = block;
+
+	store(page, block);
+
+	[PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
+
+	//context switch
+
+	multipush(R0, R1, R2, R3, R4);
+	call SCHEDULER;
+	multipop(R0, R1, R2, R3, R4);
+
+	return;
+	
+endif;
+
+
+
 if ( func_num == DISK_LOAD) then
 	alias page_num R3;
 	alias block_num R4;

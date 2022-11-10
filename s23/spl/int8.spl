@@ -12,14 +12,18 @@ parentProcessTable = PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16;
 [parentProcessTable + 13] = SP;
 SP = [parentProcessTable + 11]*512 -1;
 
+
 // call get pcb entry
+
 multipush(R0,R4);
 R1 = GET_PCB_ENTRY;
 call PROCESS_MANAGER;
 R1 = R0;
 multipop(R0,R4);
-print R1;
+// print R1;
+
 alias childPID R1;
+
 if( childPID == -1 ) then
 	alias ret R2;
 	ret = ( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
@@ -82,7 +86,6 @@ multipop(R0, R1, R2, R3, R4, R5);
 
 
 //initialise the process table of child
-[childProcessTable + 1] = childPID;
 [childProcessTable + 3] = [parentProcessTable + 3]; // user id
 [childProcessTable + 6] = [parentProcessTable + 6]; // swap flag
 [childProcessTable + 10] = [parentProcessTable + 10];  // user area swap status
@@ -115,8 +118,8 @@ endwhile;
 
 //copy the per process disk map table of parent to child
 
-i = 2;
-while( i <= 7 ) do
+i = 0;
+while( i <= 9 ) do
 	if( i == 0 || i == 1 || i == 8 || i == 9 ) then
 		[DISK_MAP_TABLE + childPID*10 + i] = -1;
 	else
@@ -130,17 +133,18 @@ endwhile;
 i = 0;
 while( i <= 7 ) do
 	[childPTBR + i*2] = [PTBR + i*2];
-	[MEMORY_FREE_LIST + [childPTBR + i*2]] = 1 + [MEMORY_FREE_LIST + [childPTBR + i*2]];
+	[MEMORY_FREE_LIST + [childPTBR + i*2]] =  [MEMORY_FREE_LIST + [childPTBR + i*2]] + 1;
 	[childPTBR + i*2+1] = [PTBR + i*2+1];
 	i = i + 1;
 endwhile;
 
 
-//stack pages were assigned in line number: 56
+//stack pages were already assigned
 //but the auxiliarly inforamation should be same as parent
 
 [childPTBR + 8*2 + 1] = [PTBR + 8*2 + 1];
 [childPTBR + 9*2 + 1] = [PTBR + 9*2 + 1];
+
 
 // copy the content of user stack 
 i = 0;
@@ -153,8 +157,7 @@ endwhile;
 
 //store value in BP to top of kernel stack of child process
 
-i = [childProcessTable + 12]*512-1;
-i = i + 1;
+i = [childProcessTable + 12]*512;
 [i] = BP;
 
 
