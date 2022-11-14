@@ -1,0 +1,119 @@
+breakpoint;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1]*16 + 11]*512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1, systemCallNumber
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+alias systemCallNumber R1;
+systemCallNumber = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+alias returnAddress R10;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias currentPCB R11;
+currentPCB = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+if (systemCallNumber == INT_OPEN) then
+    [currentPCB + 9] = 2;
+
+    alias kernelStack R2;
+    kernelStack = [currentPCB + 11];
+
+    alias fileDescriptor R3;
+    fileDescriptor = 0;
+    while (fileDescriptor < 8) do
+        if ([(kernelStack+1)*512 - (fileDescriptor+8)*2] == -1) then
+            break;
+        endif;
+        fileDescriptor = fileDescriptor + 1;
+    endwhile;
+
+    if (fileDescriptor == 8) then
+        [returnAddress] = -3;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        breakpoint;
+        ireturn;
+    endif;
+
+    alias fileName R4;
+    fileName = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    alias openFileTableIndex R6;
+    multipush (R0, R1, R2, R3, R4, R10, R11);
+    R1 = OPEN;
+    R2 = fileName;  
+    call FILE_MANAGER;
+    openFileTableIndex = R0;
+    multipop  (R0, R1, R2, R3, R4, R10, R11);
+
+    if (openFileTableIndex < 0) then
+        [returnAddress] = openFileTableIndex;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        breakpoint;
+        ireturn;
+    endif;
+
+    [(kernelStack+1)*512 - 2*(fileDescriptor+8) + 0] = FILE; 
+    [(kernelStack+1)*512 - 2*(fileDescriptor+8) + 1] = openFileTableIndex;
+
+    [returnAddress] = fileDescriptor;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_CLOSE) then
+    [currentPCB + 9] = 3;
+
+    alias fileDescriptor R2;
+    fileDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    if (fileDescriptor < 0 || fileDescriptor > 7) then
+        [returnAddress] = -1;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        breakpoint;
+        ireturn;
+    endif;
+
+    alias kernelStack R3;
+    kernelStack = [currentPCB + 11];
+
+    if ([(kernelStack+1)*512 - 2*(fileDescriptor+8)] == -1 || [(kernelStack+1)*512 - 2*(fileDescriptor+8)] != FILE) then
+        [returnAddress] = -1;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        breakpoint;
+        ireturn;
+    endif;
+
+    alias openFileTableIndex R4;
+    openFileTableIndex = [(kernelStack+1)*512 + 2*(fileDescriptor+8) + 1];
+
+    multipush (R0, R1, R2, R3, R4, R10, R11);
+    R1 = CLOSE;
+    R2 = openFileTableIndex;
+    call FILE_MANAGER;
+    multipop  (R0, R1, R2, R3, R4, R10, R11);
+
+    [(kernelStack+1)*512 - 2*(fileDescriptor+8)] = -1;
+
+    [returnAddress] = 0;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    breakpoint;
+    ireturn;
+endif;

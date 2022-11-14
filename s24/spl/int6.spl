@@ -1,0 +1,155 @@
+breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1] * 16 + 9] = 7;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]* 16 + 11]*512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+alias fileDescriptor R1;
+fileDescriptor = [([PTBR + 2*((userSP-4)/512)]*512) + (userSP-4)%512];
+
+alias returnAddress R10;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias currentPCB R11;
+currentPCB = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+if(fileDescriptor == -1) then
+	alias word R2;
+	word = [([PTBR + 2*((userSP-3) / 512)] * 512) + ((userSP - 3) % 512)];
+	
+	multipush (R0, R10, R11);
+	R1 = TERMINAL_READ;
+	R3 = word;
+	R2 = [SYSTEM_STATUS_TABLE+1];
+	call DEVICE_MANAGER;
+	multipop (R0, R10, R11);
+	
+	[returnAddress] = 0;	
+	SP = userSP;
+	[currentPCB + 9] = 0;
+
+	breakpoint;
+	ireturn; 	
+endif;
+
+if (fileDescriptor >= 0 && fileDescriptor < 8) then
+	alias kernelStack R2;
+	kernelStack = [currentPCB + 11];
+
+	if ([kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor] != FILE) then
+		[returnAddress] = -1;
+		SP = userSP;
+		[currentPCB + 9] = 0;
+
+		breakpoint;
+		ireturn;
+	endif;
+
+	alias openFileTableIndex R3;
+	openFileTableIndex = [kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor + 1];
+
+	alias inodeIndex R4;
+	inodeIndex = [OPEN_FILE_TABLE + openFileTableIndex*4];
+
+	multipush (R0, R1, R2, R3, R4, R10, R11);
+	R1 = ACQUIRE_INODE;
+	R2 = inodeIndex;
+	R3 = [SYSTEM_STATUS_TABLE+1];
+	call RESOURCE_MANAGER;
+	R15 = R0;
+	multipop  (R0, R1, R2, R3, R4, R10, R11);
+
+	if (R15 == -1) then
+		[returnAddress] = -1;
+		SP = userSP;
+		[currentPCB + 9] = 0;
+
+		breakpoint;
+		ireturn;
+	endif;
+
+	alias seek R6;
+	seek = [OPEN_FILE_TABLE + openFileTableIndex*4 + 2];
+
+	alias wordAddress R7;
+	wordAddress = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+	if ([OPEN_FILE_TABLE + openFileTableIndex*4] == INODE_ROOT) then
+		if (seek == 480) then
+			multipush (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+			R1 = RELEASE_INODE;
+			R2 = inodeIndex;
+			R3 = [SYSTEM_STATUS_TABLE+1];
+			call RESOURCE_MANAGER;
+			multipop (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+
+			[returnAddress] = -2;
+			[currentPCB + 9] = 0;
+			SP = userSP;
+
+			breakpoint;
+			ireturn;
+		endif;
+
+		[wordAddress] = [ROOT_FILE + seek];
+		[OPEN_FILE_TABLE + openFileTableIndex*4 + 2] = seek + 1;
+
+	else 
+		if (seek == [INODE_TABLE + inodeIndex*16 + 2]) then
+			multipush (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+			R1 = RELEASE_INODE;
+			R2 = inodeIndex;
+			R3 = [SYSTEM_STATUS_TABLE+1];
+			call RESOURCE_MANAGER;
+			multipop (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+
+			[returnAddress] = -2;
+			[currentPCB + 9] = 0;
+			SP = userSP;
+
+			breakpoint;
+			ireturn;
+		endif;
+
+		alias blockNumber R8;
+		alias blockOffset R12;
+		blockOffset = seek/512;
+		alias offset R9;
+		offset = seek%512;
+
+		blockNumber = [INODE_TABLE + inodeIndex*16 + 8 + blockOffset];
+
+		multipush (R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11);
+		R1 = BUFFERED_READ;
+		R2 = blockNumber;
+		R3 = offset;
+		R4 = wordAddress;
+		// print blockNumber;
+		call FILE_MANAGER;
+		multipop  (R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11);
+
+		[OPEN_FILE_TABLE + openFileTableIndex*4 + 2] = seek + 1;
+	endif;
+
+	multipush (R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11);
+	R1 = RELEASE_INODE;
+	R2 = inodeIndex;
+	R3 = [SYSTEM_STATUS_TABLE+1];
+	call RESOURCE_MANAGER;
+	multipop  (R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11);
+
+	[returnAddress] = 0;
+else
+	[returnAddress] = -1;
+endif;
+
+SP = userSP;
+[currentPCB + 9] = 0;
+
+breakpoint;
+ireturn; 

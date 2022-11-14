@@ -1,0 +1,166 @@
+breakpoint;
+
+// saving user stack
+
+alias userSP R0;
+userSP = SP;
+
+ 
+// switching stack to kernel stack
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11]*512 - 1;		//change
+
+
+// adding mode flag for exec sys call
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9;
+
+
+// extracting file name from user stack
+
+alias file_name R1;
+file_name = [([PTBR + 2 * (userSP - 4)/ 512] * 512) + ((userSP - 4) % 512)];  // change
+
+
+// checking the inode table for the required file
+
+alias inode_index R6;
+inode_index = 0;
+while( inode_index < MAX_FILE_NUM && [INODE_TABLE + inode_index*16 + 1] != file_name) do
+	inode_index = inode_index + 1;	
+endwhile;
+
+
+// file not found
+
+if ( inode_index == MAX_FILE_NUM || [INODE_TABLE + inode_index*16 + 1] != file_name || [INODE_TABLE + inode_index*16 + 0] != EXEC) then
+	[([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512)] = -1;
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+	SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];
+	ireturn;
+endif;
+
+
+//  calling exit process
+
+multipush(R0,R1,R2,R6);
+	 
+alias func_num R1;
+alias currPID R2;
+func_num = EXIT_PROCESS;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+	 
+call PROCESS_MANAGER;
+	 
+multipop(R0,R1,R2,R6);
+
+
+// refetching the same user area page
+
+alias user_area_page_num R3;
+user_area_page_num = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11];
+[MEMORY_FREE_LIST + user_area_page_num] = [MEMORY_FREE_LIST + user_area_page_num] + 1;
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+
+// initializing kernel stack of new process
+
+SP = user_area_page_num*512 - 1;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = RUNNING;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 7] = inode_index;
+
+
+// initializing per process resource table
+alias i R5;
+
+i = 496 ;
+while(i < 512 ) do
+	[user_area_page_num*512 + i] = -1;
+	[user_area_page_num*512 + i + 1] = -1;
+	i = i + 1;
+endwhile;
+
+// setting up page table for new process
+
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+
+//Heap
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+multipush(R0,R6);
+func_num = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+
+//Stack
+[PTBR+16] = R0;
+[PTBR+17] = "0110";
+
+func_num = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+
+//Stack
+[PTBR+18] = R0;
+[PTBR+19] = "0110";
+
+multipop(R0,R6);
+
+breakpoint;
+//Code page allocation
+
+multipush(R0,R2,R6);
+alias block_num R2;
+func_num = GET_CODE_PAGE;
+block_num = [INODE_TABLE + inode_index*16 + 8];
+call MEMORY_MANAGER;
+
+[PTBR+8] = R0;
+[PTBR+9] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+multipop(R0,R2,R6);
+
+
+// initializing disk map table
+
+alias currPID R2;
+currPID = [SYSTEM_STATUS_TABLE + 1];
+i = 2;
+while ( i < 10) do
+	[DISK_MAP_TABLE + currPID*10 +i] = -1;
+	i = i + 1;
+endwhile;
+
+breakpoint;
+alias j R7;
+i = 4;
+j = 8;
+while ( i < 8 ) do
+	[DISK_MAP_TABLE + currPID*10 +i] = [INODE_TABLE + inode_index*16 + j];
+	i = i + 1;
+	j = j + 1;
+endwhile;
+
+
+SP = 8 * 512 ;
+[[PTBR+16] * 512] = [[PTBR+8] * 512 + 1];	// push code starting address to user stack
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;	// resetting mode flag
+
+breakpoint;
+ireturn;

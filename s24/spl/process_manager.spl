@@ -1,0 +1,167 @@
+breakpoint;
+
+alias func_num R1;
+alias currPID R2;
+
+if ( func_num == GET_PCB_ENTRY ) then
+   
+	currPID = 0;
+	while( currPID < 16 ) do
+		if( [PROCESS_TABLE + currPID*16 + 4] == TERMINATED ) then
+			break;
+		endif;
+		currPID = currPID + 1;
+	endwhile;
+
+	if( currPID == 16) then
+		R0 = -1;
+		return;
+	endif;
+
+
+	// found a free pcb entry
+	[PROCESS_TABLE + currPID*16 + 1] = currPID;
+	[PROCESS_TABLE + currPID*16 + 4] = ALLOCATED;
+	[PROCESS_TABLE + currPID*16 + 14] = PAGE_TABLE_BASE + currPID*20;
+	[PROCESS_TABLE + currPID*16 + 15] = 10;
+	R0 = currPID;
+    
+    breakpoint;
+	return;
+
+endif;
+
+if ( func_num == FREE_USER_AREA_PAGE ) then
+    alias userAreaPage R3;
+	userAreaPage = [PROCESS_TABLE + currPID*16 + 11];
+
+
+	//free all the semaphores of the process
+	
+    alias i R4;
+	i = 0;
+	while( i < 8 ) do
+		if( [userAreaPage*512 + 496 + i*2] == SEMAPHORE && [userAreaPage*512 + 496 + i*2 + 1] != -1) then      // change 512 -2*i
+			multipush(R0, R1, R2, R3, R4);
+			R1 = RELEASE_SEMAPHORE;
+			R2 = [userAreaPage*512 + 496 + i*2 + 1];
+			R3 = currPID;
+			call RESOURCE_MANAGER;
+			multipop(R0, R1, R2, R3, R4);
+		endif;
+        if( [userAreaPage*512 + 496 + i*2] == FILE && [userAreaPage*512 + 496 + i*2 + 1] != -1) then      // change 512 -2*i
+			multipush(R0, R1, R2, R3, R4);
+			R1 = CLOSE;
+			R2 = [userAreaPage*512 + 496 + i*2 + 1];
+			call FILE_MANAGER;
+			multipop(R0, R1, R2, R3, R4);
+		endif;
+
+		i = i + 1;
+	endwhile;
+
+    multipush(R1,R2);
+
+    alias func_num R1;
+	alias user_area_page_num R2;
+    func_num = RELEASE_PAGE;
+    user_area_page_num = [PROCESS_TABLE + currPID*16 + 11];
+
+    call MEMORY_MANAGER;
+
+    multipop(R1,R2);
+
+    breakpoint;
+    return;
+
+endif;
+
+
+if ( func_num == EXIT_PROCESS ) then
+
+	if( [PROCESS_TABLE + currPID*16 + 9] != 9 ) then
+		// not comming from exec syscall
+		alias i R3;
+		i = 0;
+		while( i < 16 ) do
+			if( [PROCESS_TABLE + i*16 + 4] == WAIT_PROCESS && [PROCESS_TABLE + i*16 + 5] == currPID ) then
+				[PROCESS_TABLE + i*16 + 4] = READY;
+			endif;
+			if( [PROCESS_TABLE + i*16 + 2] == currPID ) then
+				[PROCESS_TABLE + i*16 + 2] = -1;
+			endif;
+			i = i + 1;
+		endwhile;
+	endif;
+
+    multipush(R1,R2);
+    
+    alias func_num R1;
+    func_num = FREE_PAGE_TABLE;
+
+    call PROCESS_MANAGER;
+    multipop(R1,R2);
+
+    multipush(R1,R2);
+    func_num = FREE_USER_AREA_PAGE;
+    call PROCESS_MANAGER;
+    
+    multipop(R1,R2);
+
+    [PROCESS_TABLE + currPID*16 + 4] = TERMINATED;
+
+    breakpoint;
+    return;
+	
+endif;
+
+if ( func_num == FREE_PAGE_TABLE ) then
+    alias ptbr R3;
+    ptbr = [PROCESS_TABLE + 16*currPID + 14]; 
+	[ptbr + 0] = -1; 
+	[ptbr + 1] = "0000"; 
+	[ptbr + 2] = -1; 
+	[ptbr + 3] = "0000";
+
+    alias i R4;
+    i = 4;
+    while( i <= 18 ) do
+        if ([ptbr + i] != -1 ) then
+            multipush(R1,R2,R3,R4);
+
+            alias func_num R1;
+	        alias page_num R2;
+            func_num = RELEASE_PAGE;
+            page_num = [ptbr + i];
+
+            call MEMORY_MANAGER;
+
+            multipop(R1,R2,R3,R4);
+            // print "aagaya";
+            [ptbr + i] = -1;
+            [ptbr + i + 1] = "0000";
+        endif;
+        i = i + 2;
+    endwhile; 
+
+    alias block_num R3;
+    // looping through disk map table
+
+    i  = 2;
+    while ( i < 10) do
+        if ( (i == 2 || i == 3 || i == 8 || i == 9) && [DISK_MAP_TABLE + currPID*10 + i] != -1) then
+            func_num  = RELEASE_BLOCK;
+            block_num = [DISK_MAP_TABLE + currPID*10 + i];
+            multipush(R2,R4);
+            call MEMORY_MANAGER;
+            multipop(R2,R4);
+        endif;
+        [DISK_MAP_TABLE + currPID*10 +i] = -1;
+        i = i + 1;
+    endwhile;
+
+	
+endif;
+
+breakpoint;
+return;
