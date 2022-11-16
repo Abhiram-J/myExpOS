@@ -1,0 +1,141 @@
+breakpoint;
+
+alias func_num R1;
+alias page_num R2;
+
+if ( func_num == GET_FREE_PAGE ) then
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;
+
+    while( [SYSTEM_STATUS_TABLE + 2] == 0 ) do
+       [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 4] = WAIT_MEM;
+       multipush(R1,R2);
+       call SCHEDULER; 
+       multipop(R1,R2);
+    endwhile;
+
+    [SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;
+    [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+    
+    alias free_page R0;
+    free_page = 76;
+    while(free_page < 128 && [MEMORY_FREE_LIST + free_page] >= 1) do
+        free_page = free_page + 1;
+    endwhile;
+    if ( free_page < 128 ) then
+        [MEMORY_FREE_LIST + free_page] = 1;
+    else
+        free_page = -1;
+    endif;
+
+    breakpoint;
+    return;
+
+    
+endif;
+
+
+if ( func_num == RELEASE_PAGE ) then
+	[MEMORY_FREE_LIST + page_num] = [MEMORY_FREE_LIST + page_num] - 1;
+
+    if ([MEMORY_FREE_LIST + page_num] == 0) then
+        [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+    endif;
+
+    alias i R3;
+    i = 0 ;
+    while(i < 16) do
+        if([PROCESS_TABLE + i*16 + 4] == WAIT_MEM) then
+            [PROCESS_TABLE + i*16 + 4 ] = READY;
+        endif;
+        i = i + 1;
+    endwhile;
+
+    breakpoint;
+    return;
+	
+endif;
+
+
+
+if (func_num == GET_FREE_BLOCK) then
+
+    alias free_block R0;
+    free_block = DISK_FREE_AREA;
+
+    while (free_block < DISK_SWAP_AREA) do
+        if ([DISK_FREE_LIST + free_block] == 0) then
+            [DISK_FREE_LIST + free_block] = 1;
+            R0 = free_block;
+            break;
+        endif;
+        free_block = free_block + 1;
+    endwhile;
+
+    if( free_block == DISK_SWAP_AREA ) then
+        R0 = -1;
+    endif;
+
+    breakpoint;
+    return;
+endif;
+
+
+
+
+if ( func_num == RELEASE_BLOCK ) then           // release block
+	alias block_num R2;
+    alias pid R3;
+
+    [DISK_FREE_LIST + block_num] = [DISK_FREE_LIST + block_num] - 1;
+	breakpoint;
+    return;
+
+endif;
+
+
+
+if ( func_num == GET_CODE_PAGE ) then           // get code page
+
+    alias block_num R2;
+    alias i R3;
+    alias j R4;
+    i = 0 ;
+    while(i < 16) do
+        j = 4;
+        while(j < 8 && [DISK_MAP_TABLE + i*10 + j] != block_num) do
+            j = j + 1;
+        endwhile;
+
+        if ( j < 8 ) then
+            if ( [PAGE_TABLE_BASE + i*20 + 2*j] != -1) then
+                alias page_num R0;
+                page_num = [PAGE_TABLE_BASE + i*20 + 2*j];
+                [MEMORY_FREE_LIST + page_num] = [MEMORY_FREE_LIST + page_num] + 1;
+                breakpoint;
+                return;
+            endif;
+
+        endif;
+        i = i + 1;
+    endwhile;
+
+    multipush(R1,R2);
+    func_num = GET_FREE_PAGE;
+    call MEMORY_MANAGER;
+    alias page_num R0;
+    multipop(R1,R2);
+    
+    multipush(R0);
+    R1 = DISK_LOAD;
+	R4 = R2;
+	R2 = [SYSTEM_STATUS_TABLE+1];
+	R3 = page_num;
+    breakpoint;
+	call DEVICE_MANAGER;
+    multipop(R0);
+    R0 = page_num;
+
+    breakpoint;
+    return;
+	
+endif;

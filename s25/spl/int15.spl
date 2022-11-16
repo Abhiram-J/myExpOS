@@ -1,0 +1,71 @@
+// breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 21;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1, systemCallNumber
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+if ([SYSTEM_STATUS_TABLE+1] != 1 || [SYSTEM_STATUS_TABLE] != 1) then
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+multipush(R0);
+R1 = KILL_ALL;
+R2 = [SYSTEM_STATUS_TABLE+1];
+call PROCESS_MANAGER;
+multipop(R0);
+
+alias counter R5;
+counter = 0;
+while (counter < MAX_BUFFER) do
+    if ([BUFFER_TABLE + counter*4] != -1 && [BUFFER_TABLE + counter*4 + 1] == 1) then
+        multipush (R0, R5);
+        R1 = DISK_STORE;
+        R2 = [SYSTEM_STATUS_TABLE+1];
+        R3 = BUFFER_BASE + counter;
+        R4 = [BUFFER_TABLE + counter*4];
+        call DEVICE_MANAGER;
+        multipop  (R0, R5);
+    endif;
+
+    counter = counter + 1;
+endwhile;
+
+multipush(R0);
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 59;
+R4 = 3;
+call DEVICE_MANAGER;
+
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 60;
+R4 = 4;
+call DEVICE_MANAGER;
+
+
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 61;
+R4 = 2;
+call DEVICE_MANAGER;
+
+R1 = DISK_STORE;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 62;
+R4 = 5;
+call DEVICE_MANAGER;
+
+multipop(R0);
+
+halt;

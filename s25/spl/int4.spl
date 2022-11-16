@@ -1,0 +1,244 @@
+// int 4 
+breakpoint;
+
+alias userSP R0;
+userSP = SP;
+
+//extract the sys call number
+
+alias sysCallNum R1;
+sysCallNum = [([PTBR + 2*((userSP-5)/512)]*512 ) + (userSP-5)%512];
+
+alias processTable R8;
+processTable = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+alias ret R10;
+ret = ( [PTBR + 2*((userSP-1)/512)]*512 ) + (userSP-1)%512;
+
+//switch to kernel stack
+
+[processTable + 13] = SP;
+SP = [processTable + 11]*512 - 1;
+
+//Create syscall - 1
+
+if( sysCallNum == INT_CREATE ) then
+
+	//arguments -> File name, Permission (0 or 1)
+	//return value -> 0: Success, -1: No free inode table entry
+
+	[processTable + 9] = 1;
+	
+	alias fileName R2;
+	alias permission R3;
+	
+	fileName = [([PTBR + 2*((userSP-4)/512)]*512 ) + (userSP-4)%512];
+	permission = [([PTBR + 2*((userSP-3)/512)]*512 ) + (userSP-3)%512];
+
+	alias i R4;
+	alias freeIdx R6;
+	freeIdx = -1;
+	i = 0;
+	while( i < MAX_FILE_NUM ) do
+		if( [INODE_TABLE + i*16 + 1] == fileName ) then
+			//return 0: file alread present
+			
+			[ret] = 0;
+			SP = [processTable + 13];
+			[processTable + 9] = 0;
+			ireturn;
+		endif;
+		
+		if( [INODE_TABLE + i*16 + 1] == -1) then
+			freeIdx = i;
+			break;
+		endif;
+		i = i + 1;
+	endwhile;
+
+	//we are here means that we have to create a brand new file
+	//the free idx will be available in freeIdx variable
+	//if we could'nt find a free location freeIdx will be -1
+	
+	if( freeIdx == -1 ) then
+
+		[ret] = -1;
+		SP = [processTable + 13];
+		[processTable + 9] = 0;
+		ireturn;
+
+	endif;
+
+
+	alias inodeTable R9;
+	inodeTable = INODE_TABLE + freeIdx*16;
+
+	[inodeTable + 1] = fileName;
+	[inodeTable + 2] = 0;
+	[inodeTable + 0] = DATA;
+
+	
+	//user id
+	[inodeTable + 3] = [processTable + 3];
+
+	//permission
+	[inodeTable + 4] = permission;
+
+	//blocks
+	[inodeTable + 8] = -1;
+	[inodeTable + 9] = -1;
+	[inodeTable + 10] = -1;
+	[inodeTable + 11] = -1;
+
+
+	//root file entries
+	[ROOT_FILE + freeIdx*8 + 0] = fileName;
+	[ROOT_FILE + freeIdx*8 + 1] = 0;
+	[ROOT_FILE + freeIdx*8 + 2] = DATA;	
+	[ROOT_FILE + freeIdx*8 + 3] = [USER_TABLE + 2*[inodeTable + 3] + 0];
+	[ROOT_FILE + freeIdx*8 + 4] = permission;
+	
+	// print "created";
+
+	[ret] = 0;
+	SP = [processTable + 13];
+	[processTable + 9] = 0;
+
+    // breakpoint;
+	ireturn;
+
+endif;
+
+
+//delete sys call - 4
+
+if( sysCallNum == INT_DELETE ) then
+
+	//arguments -> file name
+	//return -> 0: Success/File does not exist, -1: Permission denied, -2: File is open
+
+	[processTable + 9] = 4;
+
+	alias fileName R2;
+	fileName = [([PTBR + 2*((userSP-4)/512)]*512 ) + (userSP-4)%512];
+
+	alias inodeIdx R3;
+	inodeIdx = 0;
+	
+	while( inodeIdx < MAX_FILE_NUM && [INODE_TABLE + inodeIdx*16 + 1] != fileName) do
+		inodeIdx = inodeIdx + 1;
+	endwhile;
+	
+	if( inodeIdx == MAX_FILE_NUM) then
+		[ret] = 0;
+		SP = [processTable + 13];
+		[processTable + 9] = 0;
+		ireturn;
+	endif;
+
+	
+	alias inodeEntry R9;
+	inodeEntry = INODE_TABLE + inodeIdx*16;
+
+	if( [inodeEntry ] != DATA ) then
+		
+		[ret] = -1;
+		SP = [processTable + 13];
+		[processTable + 9] = 0;
+		ireturn;
+		
+	endif;
+
+	if( [inodeEntry + 4] == EXCLUSIVE )  then
+		if( [SYSTEM_STATUS_TABLE ] != ROOT && [SYSTEM_STATUS_TABLE ] != [inodeEntry +3] ) then
+			// print "no permission";
+			
+			[ret] = -1;
+			SP = [processTable + 13];
+			[processTable + 9] = 0;
+			ireturn;
+		endif;
+	endif;
+
+
+	//acquire lock on the file by calling acquire_inode() of resource manager module
+	multipush(R0, R1, R2, R3, R4, R5, R6,  R8, R9, R10);
+	R1 = ACQUIRE_INODE;
+	R2 = inodeIdx;
+	R3 = [SYSTEM_STATUS_TABLE + 1];
+	call RESOURCE_MANAGER;
+	multipop(R0, R1, R2, R3, R4, R5, R6,  R8, R9, R10);
+
+
+	//if file open count is not -1: return -2: cant delete an open file
+	
+	if( [FILE_STATUS_TABLE + 4*inodeIdx + 1] != -1 ) then
+		//release the lock
+		
+		multipush(R0, R1, R2, R3, R4, R5, R6,  R8, R9, R10);
+		R1 = RELEASE_INODE;
+		R2 = inodeIdx;
+		R3 = [SYSTEM_STATUS_TABLE + 1];
+		call RESOURCE_MANAGER;
+		multipop(R0, R1, R2, R3, R4, R5, R6, R8, R9, R10);
+		
+		
+		[ret] = -2;
+		SP = [processTable + 13];
+		[processTable + 9] = 0;
+		ireturn;
+		
+	endif;
+
+	//for each disk block allocated to the file - release the disk blocks
+	alias i R5;
+	i = 8;
+	while( i <= 11 ) do
+		if( [inodeEntry + i] != -1 ) then
+			
+			R7 = [inodeEntry + i]%MAX_BUFFER;
+			if( [BUFFER_TABLE + (R7)*4 ] == [inodeEntry + i] ) then
+				[BUFFER_TABLE + (R7)*4 + 1] = 0;
+			endif;
+
+			//release the block
+			multipush(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10);
+			R1 = RELEASE_BLOCK;
+			R2 = [inodeEntry + i];
+			R3 = [SYSTEM_STATUS_TABLE + 1];
+			call MEMORY_MANAGER;
+			multipop(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10);
+
+			[inodeEntry + i] = -1;
+		endif;
+		i = i + 1;
+	endwhile;
+	
+	//set the file name to -1
+	[inodeEntry + 0] = -1;
+	[inodeEntry + 1] = -1;
+	
+	[ROOT_FILE + 8*inodeIdx ] = -1;
+
+	//release the lock on file: release_inode()
+	
+	multipush(R0, R1, R2, R3, R4, R5, R6,  R8, R9, R10);
+	R1 = RELEASE_INODE;
+	R2 = inodeIdx;
+	R3 = [SYSTEM_STATUS_TABLE + 1];
+	call RESOURCE_MANAGER;
+	multipop(R0, R1, R2, R3, R4, R5, R6, R8, R9, R10);
+
+
+	// print "deleted";
+
+	[ret] = 0;
+	SP = [processTable + 13];
+	[processTable + 9] = 0;
+
+	// breakpoint;
+	ireturn;
+
+endif;
+
+ireturn;

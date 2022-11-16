@@ -1,0 +1,247 @@
+breakpoint;
+
+alias func_num R1;
+alias currPID R2;
+alias word R3;
+
+if (func_num == ACQUIRE_BUFFER) then
+	alias bufferIndex R2;
+	alias currentPID R3;
+
+	while ([BUFFER_TABLE + bufferIndex*4 + 2] != -1) do
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_BUFFER;
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] = bufferIndex;
+
+		multipush (R1, R2, R3);
+		call SCHEDULER;
+		multipop  (R1, R2, R3);
+	endwhile;
+
+	[BUFFER_TABLE + bufferIndex*4 + 2] = currentPID;
+	R0 = 0;
+	breakpoint;
+	return;
+endif;
+
+
+if (func_num == RELEASE_BUFFER) then
+	alias bufferIndex R2;
+	alias currentPID R3;
+
+	if ([BUFFER_TABLE + bufferIndex*4 + 2] != currentPID) then
+		R0 = -1;
+		return;
+	endif;
+
+	[BUFFER_TABLE + bufferIndex*4 + 2] = -1;
+
+	alias counter R5;
+	counter = 0;
+	while (counter < MAX_PROC_NUM) do
+		if ([PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] == WAIT_BUFFER && [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] == bufferIndex) then
+			[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = READY;
+		endif;
+		counter = counter + 1;
+	endwhile;
+
+	R0 = 0;
+	breakpoint;
+	return;
+endif;
+
+
+if (func_num == ACQUIRE_DISK) then
+
+	while([DISK_STATUS_TABLE] == 1) do
+		[PROCESS_TABLE + currPID*16 + 4] = WAIT_DISK;
+		multipush(R1,R2,R3);
+		call SCHEDULER;
+		multipop(R1,R2,R3);
+	endwhile;
+
+	[DISK_STATUS_TABLE] = 1;
+	[DISK_STATUS_TABLE + 4] = currPID;
+
+	breakpoint;
+	return;
+
+endif;
+
+
+
+if (func_num == ACQUIRE_INODE) then
+
+	alias inodeIdx R2;
+	alias PID R3;
+	// print "inodeIdx";
+	// print inodeIdx;
+
+	//busy wait
+	while( ([FILE_STATUS_TABLE + inodeIdx*4 + 0] != -1) ) do
+		
+		[PROCESS_TABLE + PID*16 + 4] = WAIT_FILE;
+		[PROCESS_TABLE + PID*16 + 5] = inodeIdx;
+		multipush(R0, R1, R2, R3);
+		call SCHEDULER;
+		multipop(R0, R1, R2, R3);
+
+	endwhile;
+
+	//if file has already been deleted
+
+	if([INODE_TABLE + inodeIdx*16 + 1] == -1 ) then
+		R0 = -1;
+		return;
+	endif;
+
+	//lock the inode entry
+
+	[FILE_STATUS_TABLE + inodeIdx*4 + 0] = PID;
+	R0 = 0;
+
+	return;
+
+endif;
+
+
+
+if (func_num == RELEASE_INODE) then
+
+	alias inodeIdx R2;
+	alias PID R3;
+
+	if([FILE_STATUS_TABLE + inodeIdx*4 + 0] != PID ) then
+		
+		// PID is not matching the locking pid
+		R0 = -1;
+		return;
+
+	endif;
+
+	//unlock the file
+
+	[FILE_STATUS_TABLE + inodeIdx*4 + 0] = -1;
+
+	//loop through the process and wake them up
+	alias i R4;
+	i = 0;
+	while( i < MAX_PROC_NUM ) do
+		if( ([PROCESS_TABLE + i*16 + 4] == WAIT_FILE) && ([PROCESS_TABLE + i*16 + 5] == inodeIdx) ) then
+			[PROCESS_TABLE + i*16 + 4] = READY;
+		endif;
+		i = i + 1;
+	endwhile;
+	
+	R0 = 0;
+	return;
+
+endif;
+
+
+
+if (func_num == ACQUIRE_SEMAPHORE) then
+	//arguments - PID
+
+	alias i R3;
+	i = 0;
+
+	while( i < MAX_SEM_COUNT ) do
+		if( [SEMAPHORE_TABLE + i*4 + 1] == 0 ) then
+			[SEMAPHORE_TABLE + i*4 + 0] = -1;
+			[SEMAPHORE_TABLE + i*4 + 1] = 1;
+			break;
+		endif;
+		i = i + 1;
+	endwhile;
+
+	if(i == MAX_SEM_COUNT) then
+		R0 = -1;
+		return;
+	endif;
+
+	R0 = i;
+
+	breakpoint;
+	return;
+
+endif;
+
+
+
+
+if (func_num == RELEASE_SEMAPHORE) then
+
+	alias semTableIdx R2;
+	alias currPID R3;
+
+	if( [SEMAPHORE_TABLE + semTableIdx*4 + 0] == currPID ) then
+		//here semaphore is locked so we will unlock it
+
+		[SEMAPHORE_TABLE + semTableIdx*4 + 0] = -1;
+
+		//wake up blocked processes
+		alias i R5;
+		i = 1;
+
+		while( i < MAX_PROC_NUM ) do
+			if( [PROCESS_TABLE + i*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + i*16 + 5] == semTableIdx ) then
+				[PROCESS_TABLE + i*16 + 4] = READY;
+			endif;
+			i = i + 1;
+		endwhile;
+
+	endif;
+
+	[SEMAPHORE_TABLE + semTableIdx*4 + 1] = [SEMAPHORE_TABLE + semTableIdx*4 + 1] - 1;
+	breakpoint;
+	return;
+
+endif;
+
+
+
+
+
+
+if ( func_num == ACQUIRE_TERMINAL ) then
+	
+	while( [TERMINAL_STATUS_TABLE] == 1 ) do
+		[PROCESS_TABLE + currPID*16 + 4] = WAIT_TERMINAL;
+		multipush(R1,R2,R3);
+		print "ter";
+		call SCHEDULER;
+		
+		multipop(R1,R2,R3);
+	endwhile;
+	[TERMINAL_STATUS_TABLE] = 1;
+	[TERMINAL_STATUS_TABLE + 1] = currPID;
+
+	breakpoint;
+	return;
+
+endif;
+
+
+if ( func_num == RELEASE_TERMINAL ) then
+	if ( currPID != [TERMINAL_STATUS_TABLE + 1] ) then
+		R0 = -1;
+		return;
+	endif;
+	
+	[TERMINAL_STATUS_TABLE] = 0;
+	
+	alias tempPID R4;
+	tempPID = 0;
+	while( tempPID < 16 ) do
+		if ( [PROCESS_TABLE + tempPID*16 + 4] == WAIT_TERMINAL ) then
+			[PROCESS_TABLE + tempPID*16 + 4] = READY;
+		endif;
+		tempPID = tempPID + 1;
+	endwhile;
+	R0 = 0;
+
+endif;
+
+
+breakpoint;
+return;

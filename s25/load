@@ -1,0 +1,10 @@
+fdisk
+load --init ../expl/expl_progs/shell.xsm
+load --exec ../expl/expl_progs/read.xsm
+load --exec ../expl/expl_progs/read2.xsm
+load --exec ../expl/expl_progs/write.xsm
+load --exec ../expl/expl_progs/write2.xsm
+load --exec ../expl/expl_progs/write3.xsm
+load --exec ../expl/expl_progs/write4.xsm
+load --data ../expl/expl_progs/numbers.dat
+load --data ../expl/expl_progs/sample.dat

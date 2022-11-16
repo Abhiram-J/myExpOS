@@ -1,0 +1,186 @@
+breakpoint;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 5;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP; 
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+// instuctionPointer+2, returnValue, arguement3, arguement2, arguement1, interruptNumber
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+alias fileDescriptor R1;
+fileDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+alias returnAddress R10;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias process_table R11;
+process_table = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+if (fileDescriptor == -2) then
+    alias word R2;
+    word = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+    multipush (R0, R10, R11);
+    R1 = TERMINAL_WRITE;
+    R3 = word;
+    R2 = [SYSTEM_STATUS_TABLE+1];
+    call DEVICE_MANAGER;
+    multipop (R0, R10, R11);
+
+    [returnAddress] = 0;
+    [process_table + 9] = 0;
+    SP = userSP;
+
+    breakpoint;
+    ireturn;    
+endif;
+
+if (fileDescriptor < 0 || fileDescriptor > 7 ) then
+	[returnAddress] = -1;
+	[process_table + 9] = 0;
+	SP = userSP;
+
+	breakpoint;
+	ireturn;
+
+endif;
+
+alias kernelStack R2;
+kernelStack = [process_table + 11];
+
+if ([kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor] != FILE || [kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor + 1] == -1) then
+	[returnAddress] = -1;
+	SP = userSP;
+	[process_table + 9] = 0;
+
+	breakpoint;
+	ireturn;
+endif;
+
+alias openFileTableIndex R3;
+openFileTableIndex = [kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor + 1];
+
+alias inodeIndex R4;
+inodeIndex = [OPEN_FILE_TABLE + openFileTableIndex*4];
+
+alias inodeEntry R6;
+inodeEntry = INODE_TABLE + inodeIndex*16;
+
+if ([inodeEntry + 4] == EXCLUSIVE) then
+    if ([SYSTEM_STATUS_TABLE] != ROOT && [SYSTEM_STATUS_TABLE+1] != [inodeEntry + 3]) then
+        [returnAddress] = -3;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        breakpoint;
+        ireturn;
+    endif;
+endif;
+
+breakpoint;
+
+multipush (R0, R1, R2, R3, R4, R6, R10, R11);
+R1 = ACQUIRE_INODE;
+R2 = inodeIndex;
+R3 = [SYSTEM_STATUS_TABLE+1];
+call RESOURCE_MANAGER;
+R15 = R0;
+multipop  (R0, R1, R2, R3, R4, R6, R10, R11);
+
+if (R15 == -1) then
+	[returnAddress] = -1;
+	SP = userSP;
+	[process_table + 9] = 0;
+
+	breakpoint;
+	ireturn;
+endif;
+
+
+alias seek R7;
+seek = [OPEN_FILE_TABLE + openFileTableIndex*4 + 2];
+
+if (seek == MAX_FILE_SIZE) then
+
+    multipush (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+    R1 = RELEASE_INODE;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    call RESOURCE_MANAGER;
+    multipop (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+    [returnAddress] = -2;
+    [process_table + 9] = 0;
+    SP = userSP;
+
+    breakpoint;
+    ireturn;
+
+endif;
+
+
+if (seek % 512 == 0 && seek == [inodeEntry + 2]) then
+
+    multipush (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+    R1 = GET_FREE_BLOCK;
+    call MEMORY_MANAGER;
+    R15 = R0;
+    multipop (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+
+    if (R15 == -1) then
+
+        multipush (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+        R1 = RELEASE_INODE;
+        R2 = inodeIndex;
+        R3 = [SYSTEM_STATUS_TABLE+1];
+        call RESOURCE_MANAGER;
+        multipop (R0, R1, R2, R3, R4, R6, R7, R10, R11);
+        [returnAddress] = -2;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        breakpoint;
+        ireturn;
+
+    endif;
+
+    [inodeEntry + 8 + (seek/512)] = R15;
+
+endif;
+
+
+if (seek == [inodeEntry + 2]) then
+
+    [inodeEntry + 2] = [inodeEntry + 2] + 1;
+    [ROOT_FILE + inodeIndex*8 + 1] = [inodeEntry + 2];
+
+endif;
+
+alias word R8;
+word = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+multipush (R0, R1, R2, R3, R4, R6, R7, R8, R10, R11);
+R1 = BUFFERED_WRITE;
+R2 = [inodeEntry + 8 + (seek/512)];
+R3 = seek % 512;
+R4 = word;
+call FILE_MANAGER;
+multipop  (R0, R1, R2, R3, R4, R6, R7, R8, R10, R11);
+
+[OPEN_FILE_TABLE + openFileTableIndex*4 + 2] = [OPEN_FILE_TABLE + openFileTableIndex*4 + 2] + 1;
+
+multipush (R0, R1, R2, R3, R4, R6, R7, R8, R10, R11);
+R1 = RELEASE_INODE;
+R2 = inodeIndex;
+R3 = [SYSTEM_STATUS_TABLE + 1];
+call RESOURCE_MANAGER;
+multipop  (R0, R1, R2, R3, R4, R6, R7, R8, R10, R11);
+
+[returnAddress] = 0;
+[process_table + 9] = 0;
+SP = userSP;
+
+breakpoint;
+ireturn;

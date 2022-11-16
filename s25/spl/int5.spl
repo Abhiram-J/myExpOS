@@ -1,0 +1,247 @@
+breakpoint;
+
+
+alias userSP R0;
+userSP = SP;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1]*16 + 11]*512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1, systemCallNumber
+
+
+alias systemCallNumber R1;
+systemCallNumber = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+alias returnAddress R10;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias process_table R11;
+process_table = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+
+
+
+if (systemCallNumber == INT_OPEN) then
+    [process_table + 9] = 2;
+
+    alias kernelStack R2;
+    kernelStack = [process_table + 11];
+
+    alias fileDescriptor R3;
+    fileDescriptor = 0;
+
+    while (fileDescriptor < 8) do
+        if ([kernelStack*512 + 496 + 2*fileDescriptor ] == -1) then
+            break;
+        endif;
+        fileDescriptor = fileDescriptor + 1;
+    endwhile;
+
+    if (fileDescriptor == 8) then
+        [returnAddress] = -3;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias fileName R4;
+    fileName = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    alias openFileTableIndex R6;
+    multipush (R0, R1, R2, R3, R4, R10, R11);
+    R1 = OPEN;
+    R2 = fileName;  
+    call FILE_MANAGER;
+    openFileTableIndex = R0;
+    multipop  (R0, R1, R2, R3, R4, R10, R11);
+
+    if (openFileTableIndex < 0) then
+        [returnAddress] = openFileTableIndex;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    [kernelStack*512 + 496 + 2*fileDescriptor  + 0] = FILE; 
+    [kernelStack*512 + 496 + 2*fileDescriptor + 1] = openFileTableIndex;
+
+    [returnAddress] = fileDescriptor;
+    [process_table + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+
+
+
+
+
+if (systemCallNumber == INT_CLOSE) then
+    [process_table + 9] = 3;
+
+    alias fileDescriptor R2;
+    fileDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    if (fileDescriptor < 0 || fileDescriptor > 7) then
+        [returnAddress] = -1;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias kernelStack R3;
+    kernelStack = [process_table + 11];
+
+    if ([kernelStack*512 + 496 + 2*fileDescriptor + 1] == -1 || [kernelStack*512 + 496 + 2*fileDescriptor ] != FILE) then
+        [returnAddress] = -1;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias openFileTableIndex R4;
+    openFileTableIndex = [kernelStack*512 + 496 + 2*fileDescriptor + 1];
+
+    multipush (R0, R1, R2, R3, R4, R10, R11);
+    R1 = CLOSE;
+    R2 = openFileTableIndex;
+    call FILE_MANAGER;
+    multipop  (R0, R1, R2, R3, R4, R10, R11);
+
+    [kernelStack*512 + 496 + 2*fileDescriptor] = -1;
+    [kernelStack*512 + 496 + 2*fileDescriptor + 1] = -1;
+
+    [returnAddress] = 0;
+    [process_table + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+
+
+
+if (systemCallNumber == INT_SEEK) then
+
+    [process_table + 9] = 6;
+    
+    alias fileDescriptor R2;
+    fileDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    if (fileDescriptor < 0 || fileDescriptor > 7) then
+        [returnAddress] = -1;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+
+
+    alias kernelStack R12;
+    kernelStack = [process_table + 11];
+
+    if ([kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor] != FILE || [kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor + 1] == -1) then
+	    [returnAddress] = -1;
+	    SP = userSP;
+	    [process_table + 9] = 0;
+
+	    // breakpoint;
+	    ireturn;
+    endif;
+
+    alias openFileTableIndex R3;
+    openFileTableIndex = [kernelStack*512 + RESOURCE_TABLE_OFFSET + 2*fileDescriptor + 1];
+
+    alias inodeIndex R4;
+    inodeIndex = [OPEN_FILE_TABLE + 4*openFileTableIndex];
+
+    multipush(R0, R3, R4, R10, R11);
+    R1 = ACQUIRE_INODE;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    call RESOURCE_MANAGER;
+    R15 = R0;
+    multipop(R0, R3, R4, R10, R11);
+
+    if (R15 == -1) then
+        [returnAddress] = -1;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias fileSize R6;
+    
+    if ([INODE_TABLE + inodeIndex*16] == ROOT) then
+        fileSize = 480;
+    else 
+        fileSize = [INODE_TABLE + inodeIndex*16 + 2];
+    endif;
+
+    alias offset R7;
+    offset = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+    alias seek R8;
+    seek = OPEN_FILE_TABLE + openFileTableIndex*4 + 2;
+    // breakpoint;
+    // print "olseek";
+    // print seek;
+    // print "newseek";
+
+    if ([seek] + offset < 0) then
+        multipush (R0, R10, R11);
+        R1 = RELEASE_INODE;
+        R2 = inodeIndex;
+        R3 = [SYSTEM_STATUS_TABLE+1];
+        call RESOURCE_MANAGER;
+        multipop  (R0, R10, R11);
+
+        [returnAddress] = -2;
+        [process_table + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    if (offset == 0) then
+        [seek] = 0;
+    else 
+        if (offset + [seek] > fileSize) then
+            [seek] = fileSize;
+        else
+            [seek] = offset + [seek];
+        endif;
+    endif;
+
+    // print [OPEN_FILE_TABLE + openFileTableIndex*4 +2];
+    multipush (R0, R10, R11);
+    R1 = RELEASE_INODE;
+    R2 = inodeIndex;
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    call RESOURCE_MANAGER;
+    multipop  (R0, R10, R11);
+
+    [returnAddress] = 0;
+    [process_table + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;

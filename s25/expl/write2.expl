@@ -1,0 +1,38 @@
+int main()
+{
+	decl
+		str name,data;
+		int temp,a,fileDesc,perm,num;
+	enddecl
+
+	begin
+		temp = exposcall("Write", -2, "Filename");
+		temp = exposcall("Read", -1, name);
+		fileDesc = exposcall("Open", name);
+		
+		temp = exposcall("Write", -2, fileDesc);
+
+		if (fileDesc >= 0) then
+			a = exposcall("Seek",fileDesc,1100);
+			num = 2000;
+			while(num < 2514) do
+				temp = exposcall("Write",fileDesc,num);
+				num = num + 1;
+			endwhile;
+
+			a = 0;
+
+			a = exposcall("Seek",fileDesc,-1);
+			while(a != -2) do
+				temp = exposcall("Read",fileDesc,data);
+				temp = exposcall("Write",-2,data);
+				a = exposcall("Seek",fileDesc,-2);
+			endwhile;
+
+			temp = exposcall("Close",fileDesc);
+		else 
+			write ("invalid");
+		endif;
+		return 0;
+	end
+}
