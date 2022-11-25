@@ -6,5 +6,9 @@ load --exec ../expl/expl_progs/write.xsm
 load --exec ../expl/expl_progs/write2.xsm
 load --exec ../expl/expl_progs/write3.xsm
 load --exec ../expl/expl_progs/write4.xsm
+load --exec ../expl/expl_progs/ls.xsm
+load --exec ../expl/expl_progs/cat.xsm
+load --exec ../expl/expl_progs/cp.xsm
+load --exec ../expl/expl_progs/rm.xsm
 load --data ../expl/expl_progs/numbers.dat
 load --data ../expl/expl_progs/sample.dat

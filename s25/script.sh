@@ -11,6 +11,10 @@ cd $HOME/myexpos/expl
 ./expl expl_progs/write2.expl
 ./expl expl_progs/write3.expl
 ./expl expl_progs/write4.expl
+./expl expl_progs/ls.expl
+./expl expl_progs/cat.expl
+./expl expl_progs/cp.expl
+./expl expl_progs/rm.expl
 
 cd $HOME/myexpos/spl
 ./spl spl_progs/os_startup.spl

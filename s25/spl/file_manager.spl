@@ -98,12 +98,12 @@ if (func_num == BUFFERED_READ) then
 
     [[PTBR + 2*(wordAddress/512)]*512 + wordAddress%512] = [(BUFFER_BASE + bufferIndex)*512 + offset];
 
-    multipush (R1, R2, R3, R4, R6);
+    multipush(R1, R2, R3, R4, R6);
     R1 = RELEASE_BUFFER;
     R2 = bufferIndex;
     R3 = [SYSTEM_STATUS_TABLE+1];
     call RESOURCE_MANAGER;
-    multipop  (R1, R2, R3, R4, R6);
+    multipop(R1, R2, R3, R4, R6);
 
     breakpoint;
     return;
